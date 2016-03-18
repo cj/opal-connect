@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.version       = Opal::Connect::VERSION
   spec.authors       = ["cj"]
   spec.email         = ["cjlazell@gmail.com"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
+  spec.summary       = %q{Connects Opal to Ruby.}
+  spec.description   = %q{Connect Opal to Ruby.}
   spec.homepage      = ""
   spec.license       = "MIT"
 
