@@ -17,7 +17,7 @@ module Opal
             Connect.server_methods[self.name] ||= []
           end
 
-          def connect_server(m = false, &block)
+          def __server__(m = false, &block)
             return if RUBY_ENGINE == 'opal'
 
             m ||= Module.new(&block)
@@ -28,10 +28,11 @@ module Opal
               connect_server_methods << meth unless connect_server_methods.include? meth
             end
           end
+          alias server __server__
         end
 
         module ConnectInstanceMethods
-          def __connect_server__(method, *args)
+          def __server__(method, *args)
             if Connect.server_methods[self.class.name].include? method
               promise = Promise.new
 
@@ -55,7 +56,7 @@ module Opal
               raise "#{method} is not a server method"
             end
           end
-          alias connect_server __connect_server__
+          alias server __server__
         end
       end
 

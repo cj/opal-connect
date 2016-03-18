@@ -14,14 +14,16 @@ end
 module Opal
   module Connect
     class << self
-      def __options__
+      def options
         @options ||= Connect::ConnectCache.new(hot_reload: false)
-
-        yield(@options) if block_given?
-
-        @options
       end
-      alias options __options__
+
+      def setup
+        write_plugins_file
+        write_entry_file
+
+        yield(options) if block_given?
+      end
 
       def included(klass)
         if RUBY_ENGINE != 'opal'
@@ -30,19 +32,24 @@ module Opal
         end
 
         klass.extend ConnectPlugins::Base::ClassMethods
+
+        # include default plugins
         klass.plugin :server
         klass.plugin :html
         klass.plugin :dom
         klass.plugin :events
       end
 
+      # We need to wripte a plugins.rb file which has all the plugins required
+      # by the server, so that the client can require them.  Opal doesn't handle
+      # dynamically generated imports, which is the reason we make a single file.
       def write_plugins_file
-        ConnectPlugins.plugins.each do |name, klass|
-          path = klass.instance_methods(false).map { |m|
-            klass.instance_method(m).source_location.first
-          }.uniq
-
-          binding.pry
+        path = "#{Dir.pwd}/.connect/plugins.rb"
+        FileUtils.mkdir_p(File.dirname(path))
+        File.open(path, 'w+') do |f|
+          ConnectPlugins.plugins.each do |name, _|
+            f.puts "require 'opal/connect/plugins/#{name}'"
+          end
         end
       end
     end
@@ -171,16 +178,7 @@ module Opal
             end
 
             def javascript(klass, method, *options)
-              if hot_reload = Connect.options[:hot_reload]
-                required_files = Connect.files.map do |file|
-                  "`require('#{file}')`"
-                end.join(';')
-              end
-
               %{
-                #{!hot_reload ? '' : 'Opal::Connect.events_teardown'}
-                #{!hot_reload ? '' : required_files}
-
                 Opal::Connect.server_methods = JSON.parse(
                   Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
                 )
@@ -197,17 +195,30 @@ module Opal
               }
             end
 
-            def write_entry_file(klass, method, *options)
+            def write_entry_file(klass = false, method = false, *options)
               Opal.use_gem 'opal-jquery'
 
-              code = %{
-                `if (module.hot) {`
-                  `module.hot.accept()`
-                  #{Connect.javascript(klass, method, *options)}
-                `}`
-              }
+              path = "#{Dir.pwd}/.connect/entry.js"
 
-              File.write("#{Dir.pwd}/.connect/entry.js", build(code))
+              required_files = Connect.files.map do |file|
+                "`require('#{file}')`"
+              end.join(';')
+
+              if !Connect.options[:hot_reload]
+                code = required_files
+              else
+                code = %{
+                  `if (module.hot) {`
+                    `module.hot.accept()`
+                    #{required_files}
+                    Opal::Connect.events_teardown
+                    #{Connect.javascript(klass, method, *options)}
+                  `}`
+                }
+              end
+
+              FileUtils.mkdir_p(File.dirname(path))
+              File.write(path, build(code))
             end
           end
         end

@@ -9,18 +9,21 @@ module Opal
             end
           end
 
-          def connect_el el = false
+          def __events_el__ el = false
             @connect_el = el if el
             @connect_el
           end
+          alias events_el __events_el__
 
-          def connect_on(name, selector = nil, method = nil, &handler)
+
+          def __on__(name, selector = nil, method = nil, &handler)
             if RUBY_ENGINE == 'opal'
               handler = proc { |evt| __send__(method, evt) } if method
               event = [name, selector, handler]
               connect_events << event unless connect_events.include? event
             end
           end
+          alias on __on__
         end
 
         if RUBY_ENGINE == 'opal'
