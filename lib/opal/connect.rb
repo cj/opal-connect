@@ -8,31 +8,37 @@ if RUBY_ENGINE == 'opal'
       $console.log(*args)
     end
   end
-else
-  FileUtils.rm_rf("#{Dir.pwd}/.connect")
 end
 
 # Opal corelib is already loaded from CDN
 module Opal
   module Connect
 
-    CLIENT_OPTIONS = %w'url' unless RUBY_ENGINE == 'opal'
+    CLIENT_OPTIONS = %w'url plugins' unless RUBY_ENGINE == 'opal'
 
     class << self
       def options
         @options ||= Connect::ConnectCache.new(
           hot_reload: false,
-          url: '/connect'
+          url: '/connect',
+          plugins: []
         )
       end
 
+      def options=(opts)
+        @options = opts
+      end if RUBY_ENGINE == 'opal'
+
       def setup
+        yield(options) if block_given?
+
+        # make sure we include the default plugins with connect
+        options[:plugins].each { |plug| Connect.plugin plug.to_sym }
+
         unless RUBY_ENGINE == 'opal'
           write_plugins_file
           write_entry_file
         end
-
-        yield(options) if block_given?
       end
 
       def included(klass)
@@ -44,10 +50,7 @@ module Opal
         klass.extend ConnectPlugins::Base::ClassMethods
 
         # include default plugins
-        klass.plugin :server
-        klass.plugin :html
-        klass.plugin :dom
-        klass.plugin :events
+        Connect.options[:plugins].each { |plug| klass.plugin plug.to_sym }
       end
 
       # We need to wripte a plugins.rb file which has all the plugins required
@@ -56,11 +59,15 @@ module Opal
       def write_plugins_file
         path = "#{Dir.pwd}/.connect/plugins.rb"
         FileUtils.mkdir_p(File.dirname(path))
-        File.open(path, 'w+') do |f|
-          ConnectPlugins.plugins.each do |name, _|
-            f.puts "require 'opal/connect/plugins/#{name}'"
-          end
+
+        file = File.open(path, File::RDWR|File::CREAT, 0644)
+        file.flock(File::LOCK_EX|File::LOCK_NB)
+
+        ConnectPlugins.plugins.each do |name, _|
+          file.puts "require 'opal/connect/plugins/#{name}'"
         end
+
+        file.close
       end
     end
 
@@ -195,6 +202,8 @@ module Opal
             end
 
             def javascript(klass, method, *options)
+              return unless klass
+
               %{
                 Opal::Connect.server_methods = JSON.parse(
                   Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
@@ -221,10 +230,19 @@ module Opal
                 "`require('#{file}')`"
               end.join(';')
 
+              client_options = Connect.options.hash.select do |key, _|
+                CLIENT_OPTIONS.include? key.to_s
+              end
+
+              client_options = Base64.encode64 client_options.to_json
+
+              code = "Opal::Connect.options = JSON.parse(Base64.decode64('#{client_options}'));"
+              code = "#{code} Opal::Connect.setup;"
+
               if !Connect.options[:hot_reload]
-                code = required_files
+                code = "#{code} #{required_files}"
               else
-                code = %{
+                code << %{
                   `if (module.hot) {`
                     `module.hot.accept()`
                     #{required_files}
@@ -234,16 +252,11 @@ module Opal
                 }
               end
 
-              client_options = Connect.options.hash.select do |key, _|
-                CLIENT_OPTIONS.include? key
-              end
-
-              client_options = Base64.encode64 client_options.to_json
-
-              code = "#{code}; Opal::Connect.setup { |config| config = JSON.parse(Base64.decode64('#{client_options}')) }"
-
               FileUtils.mkdir_p(File.dirname(path))
-              File.write(path, build(code))
+              file = File.open(path, File::RDWR|File::CREAT, 0644)
+              file.flock(File::LOCK_EX|File::LOCK_NB)
+              file.puts build(code)
+              file.close
             end
           end
         end
@@ -256,7 +269,5 @@ module Opal
 
     extend ConnectPlugins::Base::ClassMethods
     plugin ConnectPlugins::Base
-    plugin :server
-    plugin :events
   end
 end

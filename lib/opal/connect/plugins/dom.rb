@@ -97,13 +97,21 @@ module Opal
               end
             end
 
+            # we need to lock the files to stop more than one process overriding
+            # http://www.codegnome.com/blog/2013/05/26/locking-files-with-ruby
             def save template_name = false, remove = true
               if template_name
-                File.write("#{file_name}.#{template_name.to_s}.html", self.to_html)
-                dom.remove if remove
+                path = "#{file_name}.#{template_name.to_s}.html"
               else
-                File.write(file_name, self.to_html)
+                path = file_name
               end
+
+              file = File.open(path, File::RDWR|File::CREAT, 0644)
+              file.flock(File::LOCK_EX|File::LOCK_NB)
+              file.puts self.to_html
+              file.close
+
+              dom.remove if template_name && remove
             end
             alias save! save
 
