@@ -31,7 +31,7 @@ module Opal
           alias server __server__
         end
 
-        module ConnectInstanceMethods
+        module InstanceMethods
           def __server__(method, *args)
             if Connect.server_methods[self.class.name].include? method
               promise = Promise.new
@@ -42,7 +42,7 @@ module Opal
                 klass: self.class.name
               }
 
-              HTTP.post('/connect', payload: payload) do |response|
+              HTTP.post(Connect.options[:url], payload: payload) do |response|
                 if response.ok?
                   res = JSON.from_object(`response`)
                   promise.resolve res[:body], response

@@ -8,19 +8,29 @@ if RUBY_ENGINE == 'opal'
       $console.log(*args)
     end
   end
+else
+  FileUtils.rm_rf("#{Dir.pwd}/.connect")
 end
 
 # Opal corelib is already loaded from CDN
 module Opal
   module Connect
+
+    CLIENT_OPTIONS = %w'url' unless RUBY_ENGINE == 'opal'
+
     class << self
       def options
-        @options ||= Connect::ConnectCache.new(hot_reload: false)
+        @options ||= Connect::ConnectCache.new(
+          hot_reload: false,
+          url: '/connect'
+        )
       end
 
       def setup
-        write_plugins_file
-        write_entry_file
+        unless RUBY_ENGINE == 'opal'
+          write_plugins_file
+          write_entry_file
+        end
 
         yield(options) if block_given?
       end
@@ -83,6 +93,14 @@ module Opal
 
       def to_json
         @mutex.synchronize { @hash.to_json }
+      end
+
+      def hash
+        if RUBY_ENGINE == 'opal'
+          @hash
+        else
+          @mutex.synchronize { @hash }
+        end
       end
 
       def each
@@ -159,8 +177,8 @@ module Opal
             plugin.load_dependencies(self, *args, &block) if plugin.respond_to?(:load_dependencies)
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
             extend(plugin::ClassMethods) if defined?(plugin::ClassMethods)
-            self.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
-            self.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
+            Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
+            Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
             plugin.configure(self, *args, &block) if plugin.respond_to?(:configure)
             nil
           end
@@ -173,8 +191,7 @@ module Opal
             def build(code)
               builder = Opal::Builder.new
 
-              builder.build_str(code, '(inline)' \
-                , dynamic_require_severity: :ignore).to_s
+              builder.build_str(code, '(inline)').to_s
             end
 
             def javascript(klass, method, *options)
@@ -216,6 +233,14 @@ module Opal
                   `}`
                 }
               end
+
+              client_options = Connect.options.hash.select do |key, _|
+                CLIENT_OPTIONS.include? key
+              end
+
+              client_options = Base64.encode64 client_options.to_json
+
+              code = "#{code}; Opal::Connect.setup { |config| config = JSON.parse(Base64.decode64('#{client_options}')) }"
 
               FileUtils.mkdir_p(File.dirname(path))
               File.write(path, build(code))
