@@ -9,6 +9,18 @@ module Opal
       # A thread safe cache class, offering only #[] and #[]= methods,
       # each protected by a mutex.
       module Dom
+        module ConnectClassMethods
+          def templates
+            @templates ||= ConnectCache.new
+          end
+
+          if RUBY_ENGINE == 'opal'
+            def templates=(tmpls)
+              @templates = tmpls
+            end
+          end
+        end
+
         module ClassMethods
           if RUBY_ENGINE != 'opal'
             def html_file(caller)
@@ -16,6 +28,10 @@ module Opal
               FileUtils.mkdir_p(File.dirname(path))
               path
             end
+          end
+
+          def cache
+            @cache ||= (Connect.templates[self.name] ||= {})
           end
 
           def html(scope = false, &block)
@@ -28,35 +44,37 @@ module Opal
 
           def dom
             if RUBY_ENGINE == 'opal'
-              @dom ||= Instance.new('html')
+              selector = 'html'
             else
-              @dom ||= begin
-                file_name = html_file(caller)
-                Instance.new false, file_name
-              end
+              selector = false
             end
+
+            @dom ||= Instance.new false, cache
           end
         end
 
         module InstanceMethods
+          def cache
+            self.class.cache
+          end
+
           def dom
             if RUBY_ENGINE == 'opal'
-              @dom ||= Instance.new('html')
+              selector = 'html'
             else
-              @dom ||= begin
-                file_name = self.class.html_file(caller)
-                Instance.new File.read(file_name), file_name
-              end
+              selector = cache[:html]
             end
+
+            @dom ||= Instance.new selector, cache
           end
         end
 
         class Instance
-          attr_reader :selector, :file_name, :dom
+          attr_reader :selector, :cache, :dom
 
-          def initialize(selector, file_name = false)
-            @selector   = selector
-            @file_name  = file_name
+          def initialize(selector, cache)
+            @selector = selector
+            @cache    = cache
 
             if selector.is_a?(String)
               if RUBY_ENGINE == 'opal'
@@ -66,7 +84,7 @@ module Opal
                 if selector["\n"]
                   @dom = Oga.parse_html(selector)
                 else
-                  @dom = Oga.parse_html(File.read(file_name))
+                  @dom = cache[:html]
                   @dom = dom.css(selector) unless selector == 'html'
                 end
               end
@@ -75,20 +93,34 @@ module Opal
             end
           end
 
-          if RUBY_ENGINE != 'opal'
-            def set html
-              @dom = Instance.new(html, file_name)
-            end
-            alias set! set
+          def set html
+            @dom = Instance.new(html, cache)
+          end
+          alias set! set
 
-            def to_html
+          def save template_name = false, remove = true
+            if template_name
+              cache[:"#{template_name}"] = self.to_html
+              dom.remove if remove
+            else
+              cache[:html] = self.to_html
+            end
+          end
+          alias save! save
+
+          def to_html
+            if RUBY_ENGINE == 'opal'
+              node.html
+            else
               if node.respond_to?(:first)
                 node.first.to_xml
               else
                 node.to_xml
               end
             end
+          end
 
+          if RUBY_ENGINE != 'opal'
             def to_s
               if dom.respond_to?(:first)
                 dom.first.to_xml
@@ -96,24 +128,6 @@ module Opal
                 dom.to_xml
               end
             end
-
-            # we need to lock the files to stop more than one process overriding
-            # http://www.codegnome.com/blog/2013/05/26/locking-files-with-ruby
-            def save template_name = false, remove = true
-              if template_name
-                path = "#{file_name}.#{template_name.to_s}.html"
-              else
-                path = file_name
-              end
-
-              file = File.open(path, File::RDWR|File::CREAT, 0644)
-              file.flock(File::LOCK_EX|File::LOCK_NB)
-              file.puts self.to_html
-              file.close
-
-              dom.remove if template_name && remove
-            end
-            alias save! save
 
             def text(content)
               if node.respond_to?(:inner_text)
@@ -155,11 +169,10 @@ module Opal
           end
 
           def tmpl(name)
-            if RUBY_ENGINE == 'opal'
-              puts 'need to implement tmpl'
+            if cached_tmpl = cache[:"#{name}"]
+              Instance.new(cached_tmpl, cache)
             else
-              fn = "#{file_name}.#{name}.html"
-              Instance.new(File.read(fn), fn)
+              puts "There is no template `#{name}`"
             end
           end
 
@@ -243,11 +256,11 @@ module Opal
               end
             end
 
-            Instance.new(new_node, file_name)
+            Instance.new(new_node, cache)
           end
 
           def each
-            node.each { |n| yield Instance.new(n, file_name) }
+            node.each { |n| yield Instance.new(n, cache) }
           end
 
           def node

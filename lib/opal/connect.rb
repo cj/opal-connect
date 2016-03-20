@@ -59,15 +59,11 @@ module Opal
       def write_plugins_file
         path = "#{Dir.pwd}/.connect/plugins.rb"
         FileUtils.mkdir_p(File.dirname(path))
-
-        file = File.open(path, File::RDWR|File::CREAT, 0644)
-        file.flock(File::LOCK_EX|File::LOCK_NB)
-
-        ConnectPlugins.plugins.each do |name, _|
-          file.puts "require 'opal/connect/plugins/#{name}'"
+        File.open(path, 'w+') do |file|
+          ConnectPlugins.plugins.each do |name, _|
+            file.puts "require 'opal/connect/plugins/#{name}'"
+          end
         end
-
-        file.close
       end
     end
 
@@ -235,9 +231,11 @@ module Opal
               end
 
               client_options = Base64.encode64 client_options.to_json
+              templates      = Base64.encode64 Connect.templates.hash.to_json
 
               code = "Opal::Connect.options = JSON.parse(Base64.decode64('#{client_options}'));"
               code = "#{code} Opal::Connect.setup;"
+              code = "#{code} Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
 
               if !Connect.options[:hot_reload]
                 code = "#{code} #{required_files}"
@@ -253,10 +251,7 @@ module Opal
               end
 
               FileUtils.mkdir_p(File.dirname(path))
-              file = File.open(path, File::RDWR|File::CREAT, 0644)
-              file.flock(File::LOCK_EX|File::LOCK_NB)
-              file.puts build(code)
-              file.close
+              File.write(path, build(code))
             end
           end
         end
