@@ -42,14 +42,14 @@ module Opal
             end
           end
 
-          def dom
+          def dom(selector = false)
             if RUBY_ENGINE == 'opal'
-              selector = 'html'
+              selector ||= 'html'
+              Instance.new selector, cache
             else
-              selector = false
+              selector ||= false
+              @dom ||= Instance.new selector, cache
             end
-
-            @dom ||= Instance.new false, cache
           end
         end
 
@@ -58,18 +58,20 @@ module Opal
             self.class.cache
           end
 
-          def dom
+          def dom(selector = false)
             if RUBY_ENGINE == 'opal'
-              selector = 'html'
+              selector ||= 'html'
+              Instance.new selector, cache
             else
-              selector = cache[:html]
+              selector ||= cache[:html]
+              @dom ||= Instance.new selector, cache
             end
-
-            @dom ||= Instance.new selector, cache
           end
         end
 
         class Instance
+          RETURN_VALUE_FIELDS = %w'attr prop'
+
           attr_reader :selector, :cache, :dom
 
           def initialize(selector, cache)
@@ -97,6 +99,11 @@ module Opal
             @dom = Instance.new(html, cache)
           end
           alias set! set
+
+          def load html
+            Instance.new(html, cache)
+          end
+          alias load! load
 
           def save template_name = false, remove = true
             if template_name
@@ -146,6 +153,8 @@ module Opal
                 else
                   node.each { |n| n.set(key, value) }
                 end
+
+                self
               else
                 if node.respond_to? :get
                   node.get(key)
@@ -153,8 +162,6 @@ module Opal
                   node.first.get(key)
                 end
               end
-
-              self
             end
 
             def remove
@@ -176,7 +183,7 @@ module Opal
             end
           end
 
-          def append(content, &block)
+          def append(content = false, &block)
             # content becomes scope in this case
             content = HTML::DSL.scope!(content).html(&block).to_html if block_given?
 
@@ -184,7 +191,7 @@ module Opal
               node.append(content)
             else
               if content.is_a? Dom::Instance
-                content = content.children
+                content = content.node.children
               else
                 content = Oga.parse_html(content).children
               end
@@ -192,14 +199,14 @@ module Opal
               if node.is_a?(Oga::XML::NodeSet)
                 node.each { |n| n.children = (n.children + content) }
               else
-                node.children = (children + content)
+                node.children = (node.children + content)
               end
             end
 
             self
           end
 
-          def prepend(content, &block)
+          def prepend(content = false, &block)
             # content becomes scope in this case
             content = HTML::DSL.scope!(content).html(&block).to_html if block_given?
 
@@ -264,21 +271,31 @@ module Opal
           end
 
           def node
-            if self.is_a?(Dom::Instance)
-              self.dom
+            if self.dom.respond_to? :dom
+              self.dom.dom
             else
-              dom
+              self.dom
             end
           end
 
           # This allows you to use all the oga or opal jquery methods if a
           # global one isn't set
           def method_missing(method, *args, &block)
-            if dom.respond_to?(method, true)
-              dom.send(method, *args, &block)
+            if RUBY_ENGINE == 'opal' && node.respond_to?(method, true)
+              n = node.send(method, *args, &block)
+            elsif RUBY_ENGINE != 'opal'
+              if node.is_a?(Oga::XML::NodeSet) && node.first.respond_to?(method, true)
+                n = node.first.send(method, *args, &block)
+              elsif node.respond_to?(method, true)
+                n = node.send(method, *args, &block)
+              else
+                super
+              end
             else
               super
             end
+
+            RETURN_VALUE_FIELDS.include?(method.to_s) ? n : Instance.new(n, cache)
           end
         end
       end

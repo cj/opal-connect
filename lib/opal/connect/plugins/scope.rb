@@ -21,6 +21,12 @@ module Opal
             end
           end
         end
+
+        module ClassMethods
+          def scope(scope, *args)
+            new(*args).scope(scope)
+          end
+        end
       end
 
       register_plugin :scope, Scope

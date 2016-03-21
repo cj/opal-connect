@@ -2,6 +2,8 @@ module Opal
   module Connect
     module ConnectPlugins
       module Events
+        $connect_events = Opal::Connect::ConnectCache.new if RUBY_ENGINE == 'opal'
+
         module ClassMethods
           if RUBY_ENGINE == 'opal'
             def connect_events
@@ -9,55 +11,66 @@ module Opal
             end
           end
 
-          def __events_el__ el = false
-            @connect_el = el if el
-            @connect_el
+          attr_accessor :events_dom
+
+          def events_dom(selector = false)
+            if selector
+              @events_dom = selector
+            else
+              @events_dom
+            end
           end
-          alias events_el __events_el__
 
-
-          def __on__(name, selector = nil, method = nil, &handler)
+          def on(name, selector = nil, method = nil, &handler)
             if RUBY_ENGINE == 'opal'
+              return if $connect_events_started
+
+              if name.to_s != 'document' && events_dom
+                selector = "#{events_dom} #{selector}"
+              end
+
               handler = proc { |evt| __send__(method, evt) } if method
-              event = [name, selector, handler]
+              event   = [name, selector, handler]
               connect_events << event unless connect_events.include? event
             end
           end
-          alias on __on__
         end
 
         if RUBY_ENGINE == 'opal'
           module ConnectClassMethods
-            $connect_events = ConnectCache.new unless $connect_events
+            def teardown_events
+              $connect_events.each do |klass, events|
+                el = dom('html')
 
-            def events_teardown
-              if $connect_events
-                $connect_events.each do |klass, events|
-                  el = Dom[klass.connect_el || 'body']
-
-                  events.each do |event|
-                    name, selector, wrapper = event
+                events.each do |event|
+                  name, selector, wrapper = event
+                  if name.to_s != 'document'
                     el.off(name, selector, &wrapper)
+                  else
+                    Document.off(selector, &wrapper)
                   end
                 end
-
-                $connect_events = ConnectCache.new
               end
             end
 
-            def events_start
+            def start_events
+              $connect_events_started = true
               $connect_events.each do |klass, events|
-                el = Dom[klass.connect_el || 'body']
+                el = dom('html')
 
                 events.map! do |event|
                   name, selector, handler = event
                   wrapper = proc do |e|
                     # gives you access to this, like jquery
-                    @this = Dom[e.target]
+                    @this = dom(e.current_target)
                     instance_exec(e, &handler)
                   end
 
-                  el.on(name, selector, &wrapper)
+                  if name.to_s != 'document'
+                    el.on(name, selector, &wrapper)
+                  else
+                    Document.on(selector, &wrapper)
+                  end
                   [name, selector, wrapper]
                 end
               end

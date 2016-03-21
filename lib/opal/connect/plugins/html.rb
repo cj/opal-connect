@@ -13,6 +13,12 @@ module Opal
                   script section select small source span strike strong style sub summary sup table tbody
                   td textarea tfoot th thead time title tr track tt u ul var video wbr}
 
+        module InstanceMethods
+          def html(&block)
+            HTML::DSL.scope!(self).html(&block).to_html
+          end
+        end
+
         # http://erikonrails.snowedin.net/?p=379
         class DSL
           def initialize(tag, *args, &block)

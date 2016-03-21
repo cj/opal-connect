@@ -13,7 +13,6 @@ end
 # Opal corelib is already loaded from CDN
 module Opal
   module Connect
-
     CLIENT_OPTIONS = %w'url plugins' unless RUBY_ENGINE == 'opal'
 
     class << self
@@ -33,7 +32,7 @@ module Opal
         yield(options) if block_given?
 
         # make sure we include the default plugins with connect
-        options[:plugins].each { |plug| Connect.plugin plug.to_sym }
+        options[:plugins].each { |plug| Connect.plugin plug }
 
         unless RUBY_ENGINE == 'opal'
           write_plugins_file
@@ -50,7 +49,7 @@ module Opal
         klass.extend ConnectPlugins::Base::ClassMethods
 
         # include default plugins
-        Connect.options[:plugins].each { |plug| klass.plugin plug.to_sym }
+        Connect.options[:plugins].each { |plug| klass.plugin plug }
       end
 
       # We need to wripte a plugins.rb file which has all the plugins required
@@ -61,7 +60,13 @@ module Opal
         FileUtils.mkdir_p(File.dirname(path))
         File.open(path, 'w+') do |file|
           ConnectPlugins.plugins.each do |name, _|
-            file.puts "require 'opal/connect/plugins/#{name}'"
+            plugins_path = Connect.options[:plugins_path]
+
+            if plugins_path && File.exist?("#{plugins_path}/#{name}.rb")
+              file.puts "require '#{plugins_path}/#{name}'"
+            else
+              file.puts "require 'opal/connect/plugins/#{name}'"
+            end
           end
         end
       end
@@ -128,7 +133,14 @@ module Opal
         h = @plugins
         unless plugin = h[name]
           unless RUBY_ENGINE == 'opal'
-            require "opal/connect/plugins/#{name}"
+            plugins_path = Connect.options[:plugins_path]
+
+            if plugins_path && File.exists?("#{plugins_path}/#{name}.rb")
+              require "#{plugins_path}/#{name}"
+            else
+              require "opal/connect/plugins/#{name}"
+            end
+
             raise ConnectError, "Plugin #{name} did not register itself correctly in Roda::RodaPlugins" unless plugin = h[name]
           end
         end
@@ -146,26 +158,36 @@ module Opal
       module Base
         module InstanceMethods
           if RUBY_ENGINE != 'opal'
-            def to_js(method, *options)
+            def render(method, *options, &block)
               if hl = Connect.options[:hot_reload]
                 hl = {} unless hl.is_a? Hash
                 hl = { host: 'http://localhost', port: 8080 }.merge hl
 
                 Connect.write_entry_file(self.class, method, *options)
 
-                "#{__send__(method, *options)}<script src='#{hl[:host]}:#{hl[:port]}/main.js'></script>"
+                "#{public_send(method, *options, &block)}<script src='#{hl[:host]}:#{hl[:port]}/main.js'></script>"
               else
                 js = Connect.build Connect.javascript(self.class, method, *options)
 
-                "#{send(method, *options)}<script>#{js}</script>"
+                "#{public_send(method, *options, &block)}<script>#{js}</script>"
               end
             end
           end
         end
 
         module ClassMethods
+          def render(method, *args, &block)
+            new.render(method, *args, &block)
+          end
+
           def setup(&block)
-            yield
+            if RUBY_ENGINE == 'opal'
+              return if $connect_setup_ran
+              $connect_setup_ran = true
+              Document.ready? { yield }
+            else
+              yield
+            end
           end
 
           # Load a new plugin into the current class.  A plugin can be a module
@@ -178,6 +200,7 @@ module Opal
             raise ConnectError, "Cannot add a plugin to a frozen Connect class" if RUBY_ENGINE != 'opal' && frozen?
             plugin = ConnectPlugins.load_plugin(plugin) if plugin.is_a?(Symbol)
             plugin.load_dependencies(self, *args, &block) if plugin.respond_to?(:load_dependencies)
+            return unless plugin
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
             extend(plugin::ClassMethods) if defined?(plugin::ClassMethods)
             Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
@@ -212,7 +235,7 @@ module Opal
                     klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
                   end
 
-                  Opal::Connect.events_start
+                  Opal::Connect.start_events
                 end
               }
             end
@@ -222,7 +245,7 @@ module Opal
 
               path = "#{Dir.pwd}/.connect/entry.js"
 
-              required_files = Connect.files.map do |file|
+              required_files = Connect.files.uniq.map do |file|
                 "`require('#{file}')`"
               end.join(';')
 
@@ -243,8 +266,11 @@ module Opal
                 code << %{
                   `if (module.hot) {`
                     `module.hot.accept()`
+                    Opal::Connect.teardown_events
+                    $connect_setup_ran      = false
+                    $connect_events_started = false
+                    $connect_events = Opal::Connect::ConnectCache.new
                     #{required_files}
-                    Opal::Connect.events_teardown
                     #{Connect.javascript(klass, method, *options)}
                   `}`
                 }
