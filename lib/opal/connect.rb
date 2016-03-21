@@ -20,7 +20,8 @@ module Opal
         @options ||= Connect::ConnectCache.new(
           hot_reload: false,
           url: '/connect',
-          plugins: []
+          plugins: [],
+          setup_ran: false
         )
       end
 
@@ -48,8 +49,7 @@ module Opal
 
         klass.extend ConnectPlugins::Base::ClassMethods
 
-        # include default plugins
-        Connect.options[:plugins].each { |plug| klass.plugin plug }
+        Connect.options[:plugins].each { |plug| klass.plugin plug, :included }
       end
 
       # We need to wripte a plugins.rb file which has all the plugins required
@@ -181,13 +181,7 @@ module Opal
           end
 
           def setup(&block)
-            if RUBY_ENGINE == 'opal'
-              return if $connect_setup_ran
-              $connect_setup_ran = true
-              Document.ready? { yield }
-            else
-              yield
-            end
+            yield
           end
 
           # Load a new plugin into the current class.  A plugin can be a module
@@ -197,14 +191,19 @@ module Opal
           #   Connect.plugin PluginModule
           #   Connect.plugin :csrf
           def plugin(plugin, *args, &block)
+            included = (args.first == :included) ? args.shift : false
+
             raise ConnectError, "Cannot add a plugin to a frozen Connect class" if RUBY_ENGINE != 'opal' && frozen?
             plugin = ConnectPlugins.load_plugin(plugin) if plugin.is_a?(Symbol)
             plugin.load_dependencies(self, *args, &block) if plugin.respond_to?(:load_dependencies)
             return unless plugin
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
             extend(plugin::ClassMethods) if defined?(plugin::ClassMethods)
-            Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
-            Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
+            unless included
+              Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
+              Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
+              Connect.instance_exec(plugin, &plugin::ConnectSetup) if defined?(plugin::ConnectSetup)
+            end
             plugin.configure(self, *args, &block) if plugin.respond_to?(:configure)
             nil
           end
@@ -228,15 +227,13 @@ module Opal
                   Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
                 )
 
-                Document.ready? do
-                  klass = #{klass.name}.new
+                klass = #{klass.name}.new
 
-                  if klass.respond_to?(:#{method})
-                    klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
-                  end
-
-                  Opal::Connect.start_events
+                if klass.respond_to?(:#{method})
+                  klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
                 end
+
+                Opal::Connect.start_events
               }
             end
 
@@ -266,10 +263,19 @@ module Opal
                 code << %{
                   `if (module.hot) {`
                     `module.hot.accept()`
-                    Opal::Connect.teardown_events
-                    $connect_setup_ran      = false
-                    $connect_events_started = false
-                    $connect_events = Opal::Connect::ConnectCache.new
+
+                    if Opal::Connect.respond_to? :teardown_events
+                      Opal::Connect.teardown_events
+                      connect_events  = $connect_events[Opal::Connect]
+                      $connect_events = Opal::Connect::ConnectCache.new
+
+                      if connect_events
+                        $connect_events[Opal::Connect] = connect_events
+                      end
+
+                      $connect_events_started = false
+                    end
+
                     #{required_files}
                     #{Connect.javascript(klass, method, *options)}
                   `}`
@@ -277,7 +283,7 @@ module Opal
               end
 
               FileUtils.mkdir_p(File.dirname(path))
-              File.write(path, build(code))
+              File.write(path, build("Document.ready? { #{code} }"))
             end
           end
         end

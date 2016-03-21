@@ -2,7 +2,7 @@ module Opal
   module Connect
     module ConnectPlugins
       module Events
-        $connect_events = Opal::Connect::ConnectCache.new if RUBY_ENGINE == 'opal'
+        $connect_events = ConnectCache.new if RUBY_ENGINE == 'opal'
 
         module ClassMethods
           if RUBY_ENGINE == 'opal'
