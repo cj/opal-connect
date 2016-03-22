@@ -223,17 +223,15 @@ module Opal
               return unless klass
 
               %{
-                Opal::Connect.server_methods = JSON.parse(
-                  Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
-                )
+                Document.ready? do
+                  klass = #{klass.name}.new
 
-                klass = #{klass.name}.new
+                  if klass.respond_to?(:#{method})
+                    klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
+                  end
 
-                if klass.respond_to?(:#{method})
-                  klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
+                  Opal::Connect.start_events
                 end
-
-                Opal::Connect.start_events
               }
             end
 
@@ -243,7 +241,7 @@ module Opal
               path = "#{Dir.pwd}/.connect/entry.js"
 
               required_files = Connect.files.uniq.map do |file|
-                "`require('#{file}')`"
+                !Connect.options[:hot_reload] ? "require('#{file}')" : "`require('#{file}')`"
               end.join(';')
 
               client_options = Connect.options.hash.select do |key, _|
@@ -256,6 +254,10 @@ module Opal
               code = "Opal::Connect.options = JSON.parse(Base64.decode64('#{client_options}'));"
               code = "#{code} Opal::Connect.setup;"
               code = "#{code} Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
+              code  = %{#{code} Opal::Connect.server_methods = JSON.parse(
+                Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
+              );}
+
 
               if !Connect.options[:hot_reload]
                 code = "#{code} #{required_files}"
@@ -283,7 +285,7 @@ module Opal
               end
 
               FileUtils.mkdir_p(File.dirname(path))
-              File.write(path, build("Document.ready? { #{code} }"))
+              File.write(path, build(code))
             end
           end
         end

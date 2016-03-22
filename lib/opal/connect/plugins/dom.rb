@@ -10,6 +10,8 @@ module Opal
       # each protected by a mutex.
       module Dom
         module ConnectClassMethods
+          attr_accessor :templates
+
           def templates
             @templates ||= ConnectCache.new
           end
