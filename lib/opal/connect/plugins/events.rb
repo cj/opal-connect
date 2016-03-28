@@ -29,8 +29,9 @@ module Opal
                 selector = "#{events_dom} #{selector}"
               end
 
-              handler = proc { |evt| __send__(method, evt) } if method
-              event   = [name, selector, handler]
+              klass   = self
+              handler = proc { |evt| klass.new.__send__(method, evt) } if method
+              event   = [klass, name, selector, handler]
               connect_events << event unless connect_events.include? event
             end
           end
@@ -43,7 +44,7 @@ module Opal
                 el = dom('html')
 
                 events.each do |event|
-                  name, selector, wrapper = event
+                  _, name, selector, wrapper = event
                   if name.to_s != 'document'
                     el.off(name, selector, &wrapper)
                   else
@@ -59,11 +60,12 @@ module Opal
                 el = dom('html')
 
                 events.map! do |event|
-                  name, selector, handler = event
-                  wrapper = proc do |e|
+                  klass, name, selector, handler = event
+                  wrapper = ->(e) do
+                    c = klass.name == 'Opal::Connect' ? klass : klass.new
                     # gives you access to this, like jquery
-                    @this = dom(e.current_target)
-                    instance_exec(e, &handler)
+                    c.instance_variable_set(:@this, dom(e.current_target))
+                    c.instance_exec(e, &handler)
                   end
 
                   if name.to_s != 'document'

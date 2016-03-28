@@ -21,7 +21,8 @@ module Opal
           hot_reload: false,
           url: '/connect',
           plugins: [],
-          setup_ran: false
+          setup_ran: false,
+          javascript: []
         )
       end
 
@@ -29,8 +30,8 @@ module Opal
         @options = opts
       end if RUBY_ENGINE == 'opal'
 
-      def setup
-        yield(options) if block_given?
+      def setup(&block)
+        instance_exec(&block) if block_given?
 
         # make sure we include the default plugins with connect
         options[:plugins].each { |plug| Connect.plugin plug }
@@ -163,11 +164,11 @@ module Opal
                 hl = {} unless hl.is_a? Hash
                 hl = { host: 'http://localhost', port: 8080 }.merge hl
 
-                Connect.write_entry_file(self.class, method, *options)
+                Connect.write_entry_file(self, method, *options)
 
                 "#{public_send(method, *options, &block)}<script src='#{hl[:host]}:#{hl[:port]}/main.js'></script>"
               else
-                js = Connect.build Connect.javascript(self.class, method, *options)
+                js = Connect.build Connect.javascript(self, method, *options)
 
                 "#{public_send(method, *options, &block)}<script>#{js}</script>"
               end
@@ -194,8 +195,11 @@ module Opal
             included = (args.first == :included) ? args.shift : false
 
             raise ConnectError, "Cannot add a plugin to a frozen Connect class" if RUBY_ENGINE != 'opal' && frozen?
-            plugin = ConnectPlugins.load_plugin(plugin) if plugin.is_a?(Symbol)
-            plugin.load_dependencies(self, *args, &block) if plugin.respond_to?(:load_dependencies)
+            if plugin.is_a?(Symbol)
+              Connect.options[:plugins] << plugin unless Connect.options[:plugins].include? plugin
+              plugin = ConnectPlugins.load_plugin(plugin)
+            end
+            plugin.load_dependencies(self, *args, &block) if !included && plugin.respond_to?(:load_dependencies)
             return unless plugin
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
             extend(plugin::ClassMethods) if defined?(plugin::ClassMethods)
@@ -203,8 +207,11 @@ module Opal
               Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
               Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
               Connect.instance_exec(plugin, &plugin::ConnectSetup) if defined?(plugin::ConnectSetup)
+              unless RUBY_ENGINE == 'opal'
+                Connect.options[:javascript] << plugin::ConnectJavascript if defined?(plugin::ConnectJavascript)
+              end
             end
-            plugin.configure(self, *args, &block) if plugin.respond_to?(:configure)
+            plugin.configure(self, *args, &block) if !included && plugin.respond_to?(:configure)
             nil
           end
 
@@ -222,15 +229,26 @@ module Opal
             def javascript(klass, method, *options)
               return unless klass
 
+              js         = []
+              javascript = Connect.options[:javascript]
+
+              if javascript.length
+                javascript.each do |block|
+                  js << klass.instance_exec(&block)
+                end
+              end
+
               %{
                 Document.ready? do
-                  klass = #{klass.name}.new
+                  klass = #{klass.class.name}.new
 
                   if klass.respond_to?(:#{method})
                     klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
                   end
 
-                  Opal::Connect.start_events
+                  #{js.join(';')}
+
+                  Opal::Connect.start_events unless $connect_events_started
                 end
               }
             end
@@ -257,6 +275,7 @@ module Opal
               code  = %{#{code} Opal::Connect.server_methods = JSON.parse(
                 Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
               );}
+              code = "#{code} #{Connect.options[:entry]}" if Connect.options[:entry]
 
 
               if !Connect.options[:hot_reload]
