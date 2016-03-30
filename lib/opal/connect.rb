@@ -22,7 +22,8 @@ module Opal
           url: '/connect',
           plugins: [],
           setup_ran: false,
-          javascript: []
+          javascript: [],
+          plugin_requires: []
         )
       end
 
@@ -68,6 +69,10 @@ module Opal
             else
               file.puts "require 'opal/connect/plugins/#{name}'"
             end
+          end
+
+          Connect.options[:plugin_requires].each do |require_path|
+            file.puts "require '#{require_path}'"
           end
         end
       end

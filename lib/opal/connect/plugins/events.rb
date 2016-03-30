@@ -61,8 +61,9 @@ module Opal
 
                 events.map! do |event|
                   klass, name, selector, handler = event
+                  c = klass.name == 'Opal::Connect' ? klass : klass.new
+
                   wrapper = ->(e) do
-                    c = klass.name == 'Opal::Connect' ? klass : klass.new
                     # gives you access to this, like jquery
                     c.instance_variable_set(:@this, dom(e.current_target))
                     c.instance_exec(e, &handler)
@@ -73,7 +74,8 @@ module Opal
                   else
                     Document.on(selector, &wrapper)
                   end
-                  [name, selector, wrapper]
+
+                  [klass, name, selector, wrapper]
                 end
               end
             end
