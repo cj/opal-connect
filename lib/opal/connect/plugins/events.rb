@@ -4,6 +4,13 @@ module Opal
       module Events
         $connect_events = ConnectCache.new if RUBY_ENGINE == 'opal'
 
+        module InstanceMethods
+          def connect_event_instance_variables(event, _name, _selector)
+            # gives you access to this, like jquery
+            @this = dom event.current_target
+          end
+        end
+
         module ClassMethods
           if RUBY_ENGINE == 'opal'
             def connect_events
@@ -61,19 +68,19 @@ module Opal
 
                 events.map! do |event|
                   klass, name, selector, handler = event
-                  c = klass.name == 'Opal::Connect' ? klass : klass.new
+
+                  # we want to create an anonymous class so we can use instance
+                  # methods if events are coming from the Connect module.
+                  c = klass.name == 'Opal::Connect' \
+                    ? Class.new { include Opal::Connect }.new \
+                    : klass.new
 
                   wrapper = ->(e) do
-                    # gives you access to this, like jquery
-                    c.instance_variable_set(:@this, dom(e.current_target))
+                    c.connect_event_instance_variables(e, name, selector)
                     c.instance_exec(e, &handler)
                   end
 
-                  if name.to_s != 'document'
-                    el.on(name, selector, &wrapper)
-                  else
-                    Document.on(selector, &wrapper)
-                  end
+                  (name != :document ? el : Document).on(name, selector, &wrapper)
 
                   [klass, name, selector, wrapper]
                 end

@@ -72,8 +72,6 @@ module Opal
         end
 
         class Instance
-          RETURN_VALUE_FIELDS = %w'attr prop'
-
           attr_reader :selector, :cache, :dom
 
           def initialize(selector, cache)
@@ -129,7 +127,11 @@ module Opal
             end
           end
 
-          if RUBY_ENGINE != 'opal'
+          if RUBY_ENGINE == 'opal'
+            def on(*args, &block)
+              wrapper
+            end
+          else
             def to_s
               if dom.respond_to?(:first)
                 dom.first.to_xml
@@ -297,7 +299,11 @@ module Opal
               super
             end
 
-            RETURN_VALUE_FIELDS.include?(method.to_s) ? n : Instance.new(n, cache)
+            if RUBY_ENGINE == 'opal'
+              n.is_a?(Element) ? Instance.new(n, cache) : n
+            else
+              n.class.name['Oga::'] ? Instance.new(n, cache) : n
+            end
           end
         end
       end

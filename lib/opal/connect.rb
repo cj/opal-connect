@@ -8,6 +8,8 @@ if RUBY_ENGINE == 'opal'
       $console.log(*args)
     end
   end
+else
+  Opal.append_path File.expand_path('../..', __FILE__).untaint
 end
 
 # Opal corelib is already loaded from CDN
@@ -259,8 +261,6 @@ module Opal
             end
 
             def write_entry_file(klass = false, method = false, *options)
-              Opal.use_gem 'opal-jquery'
-
               path = "#{Dir.pwd}/.connect/entry.js"
 
               required_files = Connect.files.uniq.map do |file|
