@@ -12,12 +12,52 @@ else
   Opal.append_path File.expand_path('../..', __FILE__).untaint
 end
 
-# Opal corelib is already loaded from CDN
 module Opal
   module Connect
     CLIENT_OPTIONS = %w'url plugins' unless RUBY_ENGINE == 'opal'
 
     class << self
+      attr_accessor :pids
+
+      def run(scope, server, opts = {})
+        if ENV['CUTEST']
+          scope.run server
+        else
+          @pids   = []
+          options = { env: { RACK_ENV: ENV['RACK_ENV']} }.merge opts
+
+          envs = options[:env].to_a.map { |k, v| "#{k}=#{v}" }.join ' '
+          pids << {
+            name: 'webpack',
+            pid: Process.spawn("#{envs} bundle exec rake webpack:run")
+          }
+
+          if (cutest = Connect.options[:cutest]) && pids.select { |pid| pid[:name] == 'cutest' }.empty?
+            envs = cutest[:env].to_a.map { |k, v| "#{k}=#{v}" }.join ' '
+            pids << {
+              name: 'cutest',
+              pid: Process.spawn("#{envs} #{cutest[:run]}")
+            }
+          end
+
+          scope.send(:at_exit) { quit_pids }
+
+          scope.run server
+        end
+      rescue
+        quit_pids
+      end
+
+      def quit_pids
+        begin
+          while pids.length > 0
+            Process.kill "QUIT", (pids.shift)[:pid]
+          end
+        rescue
+          # process already dead
+        end
+      end
+
       def options
         @options ||= Connect::ConnectCache.new(
           hot_reload: false,
@@ -67,14 +107,18 @@ module Opal
             plugins_path = Connect.options[:plugins_path]
 
             if plugins_path && File.exist?("#{plugins_path}/#{name}.rb")
-              file.puts "require '#{plugins_path}/#{name}'"
+              path = "require('#{plugins_path}/#{name}')"
+              path = "`#{path}`" if Connect.options[:hot_reload]
+              file.puts path
             else
-              file.puts "require 'opal/connect/plugins/#{name}'"
+              file.puts "require('opal/connect/plugins/#{name}')"
             end
           end
 
           Connect.options[:plugin_requires].each do |require_path|
-            file.puts "require '#{require_path}'"
+            path = "require('#{require_path}')"
+            path = "`#{path}`" if Connect.options[:hot_reload]
+            file.puts path
           end
         end
       end
@@ -240,20 +284,20 @@ module Opal
               javascript = Connect.options[:javascript]
 
               if javascript.length
-                javascript.each do |block|
+                javascript.uniq.each do |block|
                   js << klass.instance_exec(&block)
                 end
               end
 
               %{
+                #{js.join(';')}
+
                 Document.ready? do
                   klass = #{klass.class.name}.new
 
                   if klass.respond_to?(:#{method})
                     klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 options.to_json}')))
                   end
-
-                  #{js.join(';')}
 
                   Opal::Connect.start_events unless $connect_events_started
                 end

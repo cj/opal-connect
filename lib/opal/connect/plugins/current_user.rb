@@ -9,19 +9,19 @@ module Opal
         end
 
         def self.configure(connect, options = false)
-          if options
-            unless RUBY_ENGINE == 'opal'
-              Connect::CLIENT_OPTIONS << 'current_user'
-              connect.options[:plugin_requires] << options[:class_path]
-              require options[:class_path]
-            end
+          return unless options
 
-            connect.options[:current_user] = options
+          unless RUBY_ENGINE == 'opal'
+            Connect::CLIENT_OPTIONS << 'current_user'
+            connect.options[:plugin_requires] << options[:class_path]
+            require options[:class_path]
           end
+
+          connect.options[:current_user] = options
         end
 
         ConnectJavascript = -> do
-          "$current_user = Base64.decode64('#{Base64.encode64 current_user.to_h.to_json}')"
+          "$current_user = JSON.parse Base64.decode64('#{Base64.encode64 current_user.to_h.to_json}')"
         end
 
         module InstanceMethods

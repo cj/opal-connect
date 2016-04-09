@@ -14,8 +14,8 @@ module Opal
                   td textarea tfoot th thead time title tr track tt u ul var video wbr}
 
         module InstanceMethods
-          def html(&block)
-            HTML::DSL.scope!(self).html(&block).to_html
+          def html!(&block)
+            HTML::DSL.scope!(self).html!(&block).to_html
           end
         end
 
@@ -66,7 +66,7 @@ module Opal
           class << self
             attr_accessor :scope
 
-            def html &block
+            def html! &block
               DSL.scope!(scope).new(nil, nil, &block)
             end
 

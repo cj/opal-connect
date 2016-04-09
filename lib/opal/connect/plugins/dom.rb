@@ -40,17 +40,17 @@ module Opal
             if !block_given?
               HTML::DSL.html(&scope).to_html
             else
-              HTML::DSL.scope!(scope).html(&block).to_html
+              HTML::DSL.scope!(scope).html!(&block).to_html
             end
           end
 
           def dom(selector = false)
             if RUBY_ENGINE == 'opal'
               selector ||= 'html'
-              Instance.new selector, cache
+              Instance.new selector, cache, self
             else
               selector ||= false
-              @dom ||= Instance.new selector, cache
+              @dom ||= Instance.new selector, cache, self
             end
           end
         end
@@ -63,20 +63,21 @@ module Opal
           def dom(selector = false)
             if RUBY_ENGINE == 'opal'
               selector ||= 'html'
-              Instance.new selector, cache
+              Instance.new selector, cache, self
             else
               selector ||= cache[:html]
-              @dom ||= Instance.new selector, cache
+              @dom ||= Instance.new selector, cache, self
             end
           end
         end
 
         class Instance
-          attr_reader :selector, :cache, :dom
+          attr_reader :selector, :cache, :dom, :scope
 
-          def initialize(selector, cache)
+          def initialize(selector, cache, scope)
             @selector = selector
             @cache    = cache
+            @scope    = scope
 
             if selector.is_a?(String)
               if RUBY_ENGINE == 'opal'
@@ -96,12 +97,14 @@ module Opal
           end
 
           def set html
-            @dom = Instance.new(html, cache)
+            @dom = Instance.new(html, cache, scope)
+            @dom.save!
+            @dom
           end
           alias set! set
 
           def load html
-            Instance.new(html, cache)
+            Instance.new(html, cache, scope)
           end
           alias load! load
 
@@ -128,8 +131,17 @@ module Opal
           end
 
           if RUBY_ENGINE == 'opal'
-            def on(*args, &block)
-              wrapper
+            def on(name, selector = false, &handler)
+              if scope.respond_to?(:connect_events_started)
+                wrapper = -> (e) do
+                  scope.connect_events_started(e, name, selector)
+                  scope.instance_exec(e, &handler)
+                end
+
+                node.on(name, selector, &wrapper)
+              else
+                node.on(name, selector, &handler)
+              end
             end
           else
             def to_s
@@ -181,7 +193,7 @@ module Opal
 
           def tmpl(name)
             if cached_tmpl = cache[:"#{name}"]
-              Instance.new(cached_tmpl, cache)
+              Instance.new(cached_tmpl, cache, scope)
             else
               puts "There is no template `#{name}`"
             end
@@ -189,7 +201,7 @@ module Opal
 
           def append(content = false, &block)
             # content becomes scope in this case
-            content = HTML::DSL.scope!(content).html(&block).to_html if block_given?
+            content = HTML::DSL.scope!(content).html!(&block).to_html if block_given?
 
             if RUBY_ENGINE == 'opal'
               node.append(content)
@@ -212,7 +224,7 @@ module Opal
 
           def prepend(content = false, &block)
             # content becomes scope in this case
-            content = HTML::DSL.scope!(content).html(&block).to_html if block_given?
+            content = HTML::DSL.scope!(content).html!(&block).to_html if block_given?
 
             if RUBY_ENGINE == 'opal'
               node.prepend(content)
@@ -235,7 +247,7 @@ module Opal
 
           def html(content = false, &block)
             # content becomes scope in this case
-            content = HTML::DSL.scope!(content).html(&block).to_html if block_given?
+            content = HTML::DSL.scope!(content).html!(&block).to_html if block_given?
 
             if RUBY_ENGINE == 'opal'
               node.html(content)
@@ -267,11 +279,11 @@ module Opal
               end
             end
 
-            Instance.new(new_node, cache)
+            Instance.new(new_node, cache, scope)
           end
 
           def each
-            node.each { |n| yield Instance.new(n, cache) }
+            node.each { |n| yield Instance.new(n, cache, scope) }
           end
 
           def node
@@ -300,9 +312,9 @@ module Opal
             end
 
             if RUBY_ENGINE == 'opal'
-              n.is_a?(Element) ? Instance.new(n, cache) : n
+              n.is_a?(Element) ? Instance.new(n, cache, scope) : n
             else
-              n.class.name['Oga::'] ? Instance.new(n, cache) : n
+              n.class.name['Oga::'] ? Instance.new(n, cache, scope) : n
             end
           end
         end

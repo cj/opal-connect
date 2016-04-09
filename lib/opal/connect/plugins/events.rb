@@ -69,18 +69,21 @@ module Opal
                 events.map! do |event|
                   klass, name, selector, handler = event
 
-                  # we want to create an anonymous class so we can use instance
-                  # methods if events are coming from the Connect module.
-                  c = klass.name == 'Opal::Connect' \
-                    ? Class.new { include Opal::Connect }.new \
-                    : klass.new
-
                   wrapper = ->(e) do
+                    # we want to create an anonymous class so we can use instance
+                    # methods if events are coming from the Connect module.
+                    c = klass.name == 'Opal::Connect' \
+                      ? Class.new { include Opal::Connect }.new \
+                      : klass.new
                     c.connect_event_instance_variables(e, name, selector)
                     c.instance_exec(e, &handler)
                   end
 
-                  (name != :document ? el : Document).on(name, selector, &wrapper)
+                  if name != :document
+                    el.dom.on(name, selector, &wrapper)
+                  else
+                    Document.on(selector, &wrapper)
+                  end
 
                   [klass, name, selector, wrapper]
                 end
