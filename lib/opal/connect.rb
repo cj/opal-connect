@@ -308,7 +308,7 @@ module Opal
               path = "#{Dir.pwd}/.connect/entry.js"
 
               required_files = Connect.files.uniq.map do |file|
-                !Connect.options[:hot_reload] ? "require('#{file}')" : "`require('#{file}')`"
+                "`require('#{file}')`"
               end.join(';')
 
               client_options = Connect.options.hash.select do |key, _|
@@ -316,11 +316,13 @@ module Opal
               end
 
               client_options = Base64.encode64 client_options.to_json
-              templates      = Base64.encode64 Connect.templates.hash.to_json
 
               code = "Opal::Connect.options = JSON.parse(Base64.decode64('#{client_options}'));"
               code = "#{code} Opal::Connect.setup;"
-              code = "#{code} Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
+              if Connect.respond_to? :templates
+                templates = Base64.encode64 Connect.templates.hash.to_json
+                code      = "#{code} Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
+              end
               code  = %{#{code} Opal::Connect.server_methods = JSON.parse(
                 Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
               );}

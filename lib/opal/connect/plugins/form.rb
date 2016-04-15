@@ -10,6 +10,8 @@ module Opal
 
     module ConnectPlugins
       module Form
+        FORM_EVENTS = %i`submit keydown keyup change`
+
         def self.load_dependencies(connect, *args)
           connect.plugin :events
         end
@@ -19,7 +21,7 @@ module Opal
             super
 
             # we only want to grab form params if we are submitting a form
-            return unless name == :submit
+            return unless FORM_EVENTS.include?(name)
 
             @params = {}
 

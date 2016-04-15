@@ -11,11 +11,16 @@ module Opal
         namespace name do
           Opal::Connect.setup
           Opal::Config.dynamic_require_severity = 'ignore'
+          Opal.append_path Dir.pwd
 
-          builder = Opal::Builder.new
-          build_str = '`require("expose?$!expose?jQuery!jquery")`; require "opal"; require "opal-jquery"; require "opal/connect"; require "opal-parser";'
-          builder.build_str(build_str, '(inline)', { dynamic_require_severity: :ignore })
-          File.write "#{Dir.pwd}/.connect/opal.js", builder.to_s
+          opal_file_path = "#{Dir.pwd}/.connect/opal.js"
+
+          unless File.exist? opal_file_path
+            builder = Opal::Builder.new
+            build_str = '`require("expose?$!expose?jQuery!jquery")`; require "opal"; require "opal-jquery"; require "opal/connect"; require "opal-parser";'
+            builder.build_str(build_str, '(inline)', { dynamic_require_severity: :ignore })
+            File.write opal_file_path, builder.to_s
+          end
 
           desc "Start webpack"
           task :run do
