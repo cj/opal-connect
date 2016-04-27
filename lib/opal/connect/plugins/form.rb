@@ -1,8 +1,4 @@
-unless RUBY_ENGINE == 'opal'
-  Opal.use_gem 'scrivener-opal'
-end
-
-require 'scrivener'
+require 'opal-scrivener'
 
 module Opal
   module Connect
