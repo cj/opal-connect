@@ -17,7 +17,7 @@ module Opal
 
           unless File.exist? opal_file_path
             builder = Opal::Builder.new
-            build_str = '`require("expose?$!expose?jQuery!jquery")`; require "opal"; require "opal-jquery"; require "opal/connect"; require "opal-parser";'
+            build_str = '`require("expose?$!expose?jQuery!jquery")`; require "opal"; require "opal-jquery"; require "opal/connect";'
             builder.build_str(build_str, '(inline)', { dynamic_require_severity: :ignore })
             File.write opal_file_path, builder.to_s
           end

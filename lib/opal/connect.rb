@@ -211,13 +211,10 @@ module Opal
         module InstanceMethods
           if RUBY_ENGINE != 'opal'
             def render(method, *options, &block)
-              if hl = Connect.options[:hot_reload]
-                hl = {} unless hl.is_a? Hash
-                hl = { host: 'http://localhost', port: 8080 }.merge hl
-
+              if Connect.options[:hot_reload]
                 Connect.write_entry_file(self, method, *options)
 
-                "#{public_send(method, *options, &block)}<script src='#{hl[:host]}:#{hl[:port]}/main.js'></script>"
+                "#{public_send(method, *options, &block)}"
               else
                 js = Connect.build Connect.javascript(self, method, *options)
 

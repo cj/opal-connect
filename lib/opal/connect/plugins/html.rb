@@ -19,6 +19,12 @@ module Opal
           end
         end
 
+        module ClassMethods
+          def html!(&block)
+            HTML::DSL.scope!(self).html!(&block).to_html
+          end
+        end
+
         # http://erikonrails.snowedin.net/?p=379
         class DSL
           def initialize(tag, *args, &block)

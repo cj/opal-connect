@@ -84,7 +84,7 @@ module Opal
                 @dom = Element[selector]
               else
                 # multi-line
-                if selector["\n"]
+                if selector["\n"] || selector['html']
                   @dom = Oga.parse_html(selector)
                 else
                   @dom = cache[:html]
