@@ -69,6 +69,7 @@ module Opal
               @dom ||= Instance.new selector, cache, self
             end
           end
+          alias element dom
         end
 
         class Instance
@@ -95,6 +96,8 @@ module Opal
               @dom = selector
             end
           end
+
+          alias element dom
 
           def set html
             @dom = Instance.new(html, cache, scope)
@@ -219,7 +222,7 @@ module Opal
               end
             end
 
-            self
+            # self
           end
 
           def prepend(content = false, &block)
