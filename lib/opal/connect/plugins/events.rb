@@ -7,7 +7,8 @@ module Opal
         module InstanceMethods
           def connect_event_instance_variables(event, _name, _selector)
             # gives you access to this, like jquery
-            @this = dom event.current_target
+            @this  = dom event.current_target
+            @event = event
           end
         end
 

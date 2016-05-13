@@ -19,7 +19,12 @@ module Opal
 
           def server(method = false, *args, &block)
             if RUBY_ENGINE != 'opal'
-              method ||= Module.new(&block)
+
+              if method
+                include method
+              else
+                method = Module.new(&block)
+              end
 
               yield if block_given?
 

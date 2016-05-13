@@ -19,59 +19,16 @@ module Opal
     class << self
       attr_accessor :pids
 
-      def run(scope, server, opts = {})
-        if ENV['CUTEST']
-          scope.run server
-        else
-          @pids   = []
-          options = { env: { RACK_ENV: ENV['RACK_ENV']} }.merge opts
-
-          envs = options[:env].to_a.map { |k, v| "#{k}=#{v}" }.join ' '
-          pids << {
-            name: 'webpack',
-            pid: Process.spawn("#{envs} bundle exec rake webpack:run")
-          }
-
-          if (cutest = Connect.options[:cutest]) && pids.select { |pid| pid[:name] == 'cutest' }.empty?
-            envs = cutest[:env].to_a.map { |k, v| "#{k}=#{v}" }.join ' '
-            pids << {
-              name: 'cutest',
-              pid: Process.spawn("#{envs} #{cutest[:run]}")
-            }
-          end
-
-          scope.send(:at_exit) { quit_pids }
-
-          scope.run server
-        end
-      rescue
-        quit_pids
-      end
-
-      def quit_pids
-        begin
-          while pids.length > 0
-            Process.kill "QUIT", (pids.shift)[:pid]
-          end
-        rescue
-          # process already dead
-        end
-      end
-
       def options
-        @options ||= Connect::ConnectCache.new(
+        @_options ||= Connect::ConnectCache.new(
           hot_reload: false,
           url: '/connect',
           plugins: [],
-          setup_ran: false,
           javascript: [],
-          plugin_requires: []
+          plugin_requires: [],
+          setup_blocks: []
         )
       end
-
-      def options=(opts)
-        @options = opts
-      end if RUBY_ENGINE == 'opal'
 
       def setup(&block)
         instance_exec(&block) if block_given?
@@ -79,10 +36,7 @@ module Opal
         # make sure we include the default plugins with connect
         options[:plugins].each { |plug| Connect.plugin plug }
 
-        unless RUBY_ENGINE == 'opal'
-          write_plugins_file
-          write_entry_file
-        end
+        options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.new.instance_exec(&b) }
       end
 
       def included(klass)
@@ -239,7 +193,12 @@ module Opal
           end
 
           def setup(&block)
-            yield
+            if block_given?
+              @_setup_block = block
+              Connect.options[:setup_blocks] << @_setup_block
+            else
+              @_setup_block
+            end
           end
 
           # Load a new plugin into the current class.  A plugin can be a module
@@ -252,23 +211,31 @@ module Opal
             included = (args.first == :included) ? args.shift : false
 
             raise ConnectError, "Cannot add a plugin to a frozen Connect class" if RUBY_ENGINE != 'opal' && frozen?
+
             if plugin.is_a?(Symbol)
               Connect.options[:plugins] << plugin unless Connect.options[:plugins].include? plugin
               plugin = ConnectPlugins.load_plugin(plugin)
             end
+
             plugin.load_dependencies(self, *args, &block) if !included && plugin.respond_to?(:load_dependencies)
+
             return unless plugin
+
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
-            extend(plugin::ClassMethods) if defined?(plugin::ClassMethods)
+            extend(plugin::ClassMethods)     if defined?(plugin::ClassMethods)
+
             unless included
               Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
               Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
               Connect.instance_exec(plugin, &plugin::ConnectSetup) if defined?(plugin::ConnectSetup)
+
               unless RUBY_ENGINE == 'opal'
                 Connect.options[:javascript] << plugin::ConnectJavascript if defined?(plugin::ConnectJavascript)
               end
             end
+
             plugin.configure(self, *args, &block) if !included && plugin.respond_to?(:configure)
+
             nil
           end
 
@@ -307,7 +274,7 @@ module Opal
 
                   Opal::Connect.start_events unless $connect_events_started
                 end
-              }
+              } if klass.class.name
             end
 
             def write_entry_file(klass = false, method = false, *options)
@@ -323,15 +290,23 @@ module Opal
 
               client_options = Base64.encode64 client_options.to_json
 
-              code = "Opal::Connect.options = JSON.parse(Base64.decode64('#{client_options}'));"
-              code = "#{code} Opal::Connect.setup;"
+              code = %{
+                options = JSON.parse(Base64.decode64('#{client_options}'));
+                options.each do |key, value|
+                  Opal::Connect.options[key] = value
+                end
+              }
+              code = "#{code} Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug };"
+
               if Connect.respond_to? :templates
                 templates = Base64.encode64 Connect.templates.hash.to_json
                 code      = "#{code} Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
               end
+
               code  = %{#{code} Opal::Connect.server_methods = JSON.parse(
                 Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
               );}
+
               code = "#{code} #{Connect.options[:entry]}" if Connect.options[:entry]
 
 
@@ -360,16 +335,14 @@ module Opal
                 }
               end
 
+              code = "#{code} Opal::Connect.options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.new.instance_exec(&b) }"
+
               FileUtils.mkdir_p(File.dirname(path))
               File.write(path, build(code))
             end
           end
         end
       end
-    end
-
-    if RUBY_ENGINE == 'opal'
-      require ".connect/plugins"
     end
 
     extend ConnectPlugins::Base::ClassMethods

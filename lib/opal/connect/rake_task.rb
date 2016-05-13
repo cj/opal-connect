@@ -9,8 +9,11 @@ module Opal
         options = DEFAULT_OPTIONS.merge opts
 
         namespace name do
-          Opal::Connect.setup
-          Opal::Config.dynamic_require_severity = 'ignore'
+          return unless defined? Opal.append_path
+
+          Opal::Connect.write_plugins_file
+          Opal::Connect.write_entry_file
+
           Opal.append_path Dir.pwd
 
           opal_file_path = "#{Dir.pwd}/.connect/opal.js"
