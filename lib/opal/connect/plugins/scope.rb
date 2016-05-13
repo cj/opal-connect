@@ -2,6 +2,12 @@ module Opal
   module Connect
     module ConnectPlugins
       module Scope
+        def self.configure(connect, options = false)
+          return unless options
+
+          connect.options[:scope] = options
+        end
+
         module InstanceMethods
           def scope(new_scope = false)
             if new_scope
@@ -23,8 +29,12 @@ module Opal
         end
 
         module ClassMethods
-          def scope(scope, *args)
-            new(*args).scope(scope)
+          def scope(new_scope = false, *args)
+            if new_scope
+              @_scope = new(*args).scope(new_scope || Connect.options[:scope])
+            else
+              @_scope
+            end
           end
         end
       end
