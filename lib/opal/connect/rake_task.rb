@@ -16,7 +16,7 @@ module Opal
 
           envs = ENV.to_h.merge({
             BUNDLE_BIN: true,
-            CONNECT_STUBS: STUBS.join(','),
+            CONNECT_STUBS: STUBS.concat(Opal::Config.stubbed_files.to_a).join(','),
             OPAL_LOAD_PATH: Opal.paths.join(":"),
             OPAL_USE_BUNDLER: true
           }).inject({}) { |env, (k, v)| env[k.to_s] = v.to_s; env }
