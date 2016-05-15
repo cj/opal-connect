@@ -2,41 +2,48 @@ module Opal
   module Connect
     class RakeTask
       include Rake::DSL if defined? Rake::DSL
-
-      DEFAULT_OPTIONS = { port: 8080, host: '0.0.0.0' }
+      STUBS = %w'opal native promise console base64'
 
       def initialize(name = 'webpack', opts = {})
-        options = DEFAULT_OPTIONS.merge opts
-
         namespace name do
           return unless defined? Opal.append_path
 
-          Opal::Connect.write_plugins_file
           Opal::Connect.write_entry_file
 
           Opal.append_path Dir.pwd
 
-          opal_file_path = "#{Dir.pwd}/.connect/opal.js"
+          write_opal_file
 
-          unless File.exist? opal_file_path
-            builder = Opal::Builder.new
-            build_str = '`require("expose?$!expose?jQuery!jquery")`; require "opal"; require "opal-jquery"; require "opal/connect";'
-            builder.build_str(build_str, '(inline)', { dynamic_require_severity: :ignore })
-            File.write opal_file_path, builder.to_s
-          end
+          envs = ENV.to_h.merge({
+            BUNDLE_BIN: true,
+            CONNECT_STUBS: STUBS.join(','),
+            OPAL_LOAD_PATH: Opal.paths.join(":"),
+            OPAL_USE_BUNDLER: true
+          }).inject({}) { |env, (k, v)| env[k.to_s] = v.to_s; env }
 
           desc "Start webpack"
           task :run do
-            exec({"OPAL_LOAD_PATH" => Opal.paths.join(":")}, "webpack-dev-server --progress -d --host #{options[:host]} --port #{options[:port]} --compress --devtool eval --progress --colors --historyApiFallback true --hot --watch")
+            exec(envs, 'webpack --progress --watch')
           end
 
           desc "Build webpack"
           task :build do
-            exec({
-              "OPAL_LOAD_PATH" => Opal.paths.join(":"),
-              "RACK_ENV" => 'production'
-            }, 'webpack --progress')
+            exec(envs, 'webpack --progress')
           end
+        end
+      end
+
+      def write_opal_file
+        file_path    = "#{Dir.pwd}/.connect"
+        version_path = "#{file_path}/opal_version"
+        version      = File.exist?(version_path) ? File.read(version_path) : false
+
+        if !File.exist?("#{file_path}/opal.js") || !version || (version && version != Opal::VERSION)
+          builder   = Opal::Builder.new
+          build_str = STUBS.map { |stub| "require '#{stub}'" }.join(";")
+          builder.build_str(build_str, '(inline)', { dynamic_require_severity: :ignore })
+          File.write version_path, Opal::VERSION
+          File.write "#{file_path}/opal.js", builder.to_s
         end
       end
     end

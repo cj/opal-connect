@@ -1,0 +1,20 @@
+{
+  "name": "opal-connect",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "expose-loader": "^0.7.1",
+    "jquery": "^2.2.3",
+    "livereload": "^0.4.1",
+    "opal-webpack": "1.0.6",
+    "webpack": "2.1.0-beta.7",
+    "webpack-dev-server": "2.0.0-beta",
+    "webpack-livereload-plugin": "^0.8.1"
+  }
+}

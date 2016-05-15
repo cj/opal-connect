@@ -13,7 +13,7 @@ module Opal
 
           unless RUBY_ENGINE == 'opal'
             Connect::CLIENT_OPTIONS << 'current_user'
-            connect.options[:plugin_requires] << options[:class_path]
+            connect.options[:requires] << options[:class_path]
             require options[:class_path]
           end
 
