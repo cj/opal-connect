@@ -4,6 +4,8 @@ module Opal
       module Events
         $connect_events = ConnectCache.new if RUBY_ENGINE == 'opal'
 
+        ConnectJavascript = -> { "Opal::Connect.start_events unless $connect_events_started" }
+
         module InstanceMethods
           def connect_event_instance_variables(event, _name, _selector)
             # gives you access to this, like jquery

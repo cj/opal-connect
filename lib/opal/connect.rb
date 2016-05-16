@@ -1,4 +1,5 @@
 require 'opal'
+require 'base64'
 require "opal/connect/version"
 
 if RUBY_ENGINE == 'opal'
@@ -8,11 +9,9 @@ else
   Opal.append_path File.expand_path('../..', __FILE__).untaint
 end
 
-require 'base64'
-
 module Opal
   module Connect
-    CLIENT_OPTIONS = %w'url plugins' unless RUBY_ENGINE == 'opal'
+    CLIENT_OPTIONS = %w'url plugins'
 
     class << self
       attr_accessor :pids
@@ -38,7 +37,7 @@ module Opal
         # make sure we include the default plugins with connect
         options[:plugins].each { |plug| Connect.plugin plug }
 
-        options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.new.instance_exec(&b) }
+        options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.instance_exec(&b) }
       end
 
       def included(klass)
@@ -207,9 +206,6 @@ module Opal
               @files ||= []
             end
 
-            def build(code)
-            end
-
             def javascript(klass, method, *opts)
               return unless klass
 
@@ -219,24 +215,34 @@ module Opal
               %{
                 Document.ready? do
                   #{js.join(';')}
-
                   klass = #{klass.class.name}.new
-
-                  if klass.respond_to?(:#{method})
-                    klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}')))
-                  end
-
-                  Opal::Connect.start_events unless $connect_events_started
+                  klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})
                 end
               }
             end
 
             def write_entry_file(klass = false, method = false, *options)
               path           = "#{Dir.pwd}/.connect/entry.rb"
-              files          = Connect.files.uniq.map
+              files          = Connect.files.dup.uniq.map { |file| "require '#{file}'" }.join(';')
               entry          = Connect.options[:entry]
               client_options = Base64.encode64 Connect.client_options.to_json
-              entry_path     = "#{File.expand_path File.dirname(__FILE__)}/connect/entry.rb.erb"
+              plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join(';')
+
+              code = %{
+                require 'opal/connect'
+                #{plugins}
+                options = JSON.parse(Base64.decode64('#{client_options}'))
+                options.each { |key, value| Opal::Connect.options[key] = value }
+                #{entry}
+                #{files}
+                Opal::Connect.setup
+              }
+
+              FileUtils.mkdir_p(File.dirname(path))
+              File.write(path, code)
+            end
+
+            def plugin_paths
               plugins_path   = Connect.options[:plugins_path]
               plugins        = []
 
@@ -248,12 +254,9 @@ module Opal
                 end
               end
 
-              Connect.options[:requires].each { |path| plugins << path }
+              Connect.options[:requires].each { |plugin_path| plugins << plugin_path }
 
-              code = ::ERB.new(File.read(entry_path)).result(binding)
-
-              FileUtils.mkdir_p(File.dirname(path))
-              File.write(path, code)
+              plugins
             end
           end
         end

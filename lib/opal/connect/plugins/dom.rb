@@ -176,6 +176,8 @@ module Opal
 
             def attr(key, value = false)
               if value
+                value = value.to_s
+
                 if node.respond_to? :set
                   node.set(key, value)
                 else
