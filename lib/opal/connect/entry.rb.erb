@@ -4,21 +4,13 @@ require 'opal/connect'
   require '<%= path %>'
 <% end %>
 
-options = JSON.parse(Base64.decode64('<%= client_options %>'));
-options.each do |key, value|
-  Opal::Connect.options[key] = value
-end
+options = JSON.parse(Base64.decode64('<%= client_options %>'))
+options.each { |key, value| Opal::Connect.options[key] = value }
 
-Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug }
-
-<% if entry %>
-  <%= entry %>
-<% end %>
+<%= entry %>
 
 <% files.each do |file| %>
   require '<%= file %>'
 <% end %>
 
-Opal::Connect.options[:setup_blocks].each do |b|
-  Class.new { include Opal::Connect }.new.instance_exec(&b)
-end
+Opal::Connect.setup

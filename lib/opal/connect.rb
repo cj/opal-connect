@@ -19,7 +19,7 @@ module Opal
 
       def options
         @_options ||= Connect::ConnectCache.new(
-          hot_reload: false,
+          livereload: false,
           url: '/connect',
           plugins: [],
           javascript: [],
@@ -111,8 +111,7 @@ module Opal
       end
 
       def self.load_plugin(name)
-        h = @plugins
-        unless plugin = h[name]
+        unless plugin = @plugins[name]
           unless RUBY_ENGINE == 'opal'
             plugins_path = Connect.options[:plugins_path]
 
@@ -122,16 +121,17 @@ module Opal
               require "opal/connect/plugins/#{name}"
             end
 
-            raise ConnectError, "Plugin #{name} did not register itself correctly in Roda::RodaPlugins" unless plugin = h[name]
+            raise ConnectError, "Plugin #{name} did not register itself correctly in Opal::Connect::ConnectPlugins" unless plugin = @plugins[name]
           end
         end
+
         plugin
       end
 
-      # Register the given plugin with Roda, so that it can be loaded using #plugin
+      # Register the given plugin with Opal::Connect, so that it can be loaded using #plugin
       # with a symbol.  Should be used by plugin files. Example:
       #
-      #   Roda::RodaPlugins.register_plugin(:plugin_name, PluginModule)
+      #   Opal::Connect::ConnectPlugins.register_plugin(:plugin_name, PluginModule)
       def self.register_plugin(name, mod)
         @plugins[name] = mod
       end
@@ -140,13 +140,10 @@ module Opal
         module InstanceMethods
           if RUBY_ENGINE != 'opal'
             def render(method, *options, &block)
-              code    = Connect.javascript(self, method, *options)
-              builder = Opal::Builder.new
-              js      = builder.build_str(code, '(inline)').to_s
+              code = Connect.javascript(self, method, *options)
+              js   = Opal::Builder.new.build_str(code, '(inline)').to_s
 
-              if Connect.options[:hot_reload]
-                Connect.write_entry_file(self, method, *options)
-              end
+              Connect.write_entry_file(self, method, *options) if Connect.options[:livereload]
 
               "#{public_send(method, *options, &block)}<script>#{js}</script>"
             end
@@ -162,9 +159,9 @@ module Opal
             if block_given?
               @_setup_block = block
               Connect.options[:setup_blocks] << @_setup_block
-            else
-              @_setup_block
             end
+
+            @_setup_block
           end
 
           # Load a new plugin into the current class.  A plugin can be a module

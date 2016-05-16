@@ -6,11 +6,6 @@ const stubs            = process.env.CONNECT_STUBS.split(',');
 console.log(process.env.OPAL_STUBS)
 
 module.exports = {
-  resolve: {
-    alias: {
-      app: path.resolve( __dirname, 'app' )
-    }
-  },
   entry: {
     opal: './.connect/opal.js',
     connect: './.connect/entry.rb',
