@@ -218,7 +218,11 @@ module Opal
             content = HTML::DSL.scope!(content).html!(&block).to_html if block_given?
 
             if RUBY_ENGINE == 'opal'
-              node.append(content)
+              if content.is_a? Dom::Instance
+                node.append(content.node)
+              else
+                node.append(content)
+              end
             else
               if content.is_a? Dom::Instance
                 content = content.node.children
