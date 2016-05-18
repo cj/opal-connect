@@ -33,7 +33,6 @@ module Opal
       def setup(&block)
         if block_given?
           instance_exec(&block)
-
           # make sure we include the default plugins with connect
           options[:plugins].each { |plug| Connect.plugin plug }
         end
@@ -252,6 +251,8 @@ module Opal
                 options.each { |key, value| Opal::Connect.options[key] = value }
                 #{entry}
                 #{files}
+                # make sure we include the default plugins with connect
+                options[:plugins].each { |plug| Connect.plugin plug }
                 Opal::Connect.setup
               }
 
