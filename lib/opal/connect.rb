@@ -5,7 +5,6 @@ require "opal/connect/version"
 if RUBY_ENGINE == 'opal'
   require 'opal/connect/puts'
 else
-  require 'erb'
   Opal.append_path File.expand_path('../..', __FILE__).untaint
 end
 
@@ -36,8 +35,6 @@ module Opal
 
         # make sure we include the default plugins with connect
         options[:plugins].each { |plug| Connect.plugin plug }
-
-        options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.instance_exec(&b) }
       end
 
       def included(klass)
@@ -155,12 +152,7 @@ module Opal
           end
 
           def setup(&block)
-            if block_given?
-              @_setup_block = block
-              Connect.options[:setup_blocks] << @_setup_block
-            end
-
-            @_setup_block
+            Class.new { include Opal::Connect }.instance_exec(&block) if block_given?
           end
 
           # Load a new plugin into the current class.  A plugin can be a module

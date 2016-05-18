@@ -1,9 +1,6 @@
-const webpack          = require('webpack');
 const path             = require("path");
 const LiveReloadPlugin = require('webpack-livereload-plugin');
 const stubs            = process.env.CONNECT_STUBS.split(',');
-
-console.log(process.env.OPAL_STUBS)
 
 module.exports = {
   entry: {
