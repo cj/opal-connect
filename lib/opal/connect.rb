@@ -31,10 +31,12 @@ module Opal
       end
 
       def setup(&block)
-        instance_exec(&block) if block_given?
+        if block_given?
+          instance_exec(&block)
 
-        # make sure we include the default plugins with connect
-        options[:plugins].each { |plug| Connect.plugin plug }
+          # make sure we include the default plugins with connect
+          options[:plugins].each { |plug| Connect.plugin plug }
+        end
 
         unless block_given?
           options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.instance_exec(&b) }
