@@ -252,7 +252,7 @@ module Opal
                 #{entry}
                 #{files}
                 # make sure we include the default plugins with connect
-                options[:plugins].each { |plug| Connect.plugin plug }
+                Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug }
                 Opal::Connect.setup
               }
 
