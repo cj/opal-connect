@@ -35,6 +35,10 @@ module Opal
 
         # make sure we include the default plugins with connect
         options[:plugins].each { |plug| Connect.plugin plug }
+
+        unless block_given?
+          options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.instance_exec(&b) }
+        end
       end
 
       def included(klass)
@@ -152,7 +156,12 @@ module Opal
           end
 
           def setup(&block)
-            Class.new { include Opal::Connect }.instance_exec(&block) if block_given?
+            if block_given?
+              @_setup_block = block
+              Connect.options[:setup_blocks] << @_setup_block
+            end
+
+            @_setup_block
           end
 
           # Load a new plugin into the current class.  A plugin can be a module
