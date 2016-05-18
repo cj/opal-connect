@@ -33,7 +33,15 @@ module Opal
             if new_scope
               @_scope = new(*args).scope(new_scope || Connect.options[:scope])
             else
-              @_scope
+              @_scope ||= Connect.options[:scope]
+            end
+          end
+
+          def method_missing(method, *args, &block)
+            if scope && scope.respond_to?(method, true)
+              scope.send(method, *args, &block)
+            else
+              super
             end
           end
         end

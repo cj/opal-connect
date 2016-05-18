@@ -42,7 +42,7 @@ module Opal
           end
 
           def cache
-            @cache ||= (Connect.templates[self.name] ||= {})
+            @cache ||= (Connect.templates[self.class_name] ||= {})
           end
 
           def html(scope = false, &block)
@@ -66,7 +66,7 @@ module Opal
 
         module InstanceMethods
           def cache
-            self.class.cache
+            @cache ||= Connect.templates[self.class.name]
           end
 
           def dom(selector = false)

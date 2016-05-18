@@ -39,7 +39,18 @@ module Opal
         end
 
         unless block_given?
-          options[:setup_blocks].each { |b| Class.new { include Opal::Connect }.instance_exec(&b) }
+          options[:setup_blocks].each do |b|
+            klass = Class.new do
+              include Opal::Connect
+
+              class << self
+                attr_accessor :class_name
+              end
+            end
+            klass.class_name = b[:klass].name
+
+            klass.instance_exec(&b[:block])
+          end
         end
       end
 
@@ -160,7 +171,10 @@ module Opal
           def setup(&block)
             if block_given?
               @_setup_block = block
-              Connect.options[:setup_blocks] << @_setup_block
+              Connect.options[:setup_blocks] << {
+                block: @_setup_block,
+                klass: self
+              }
             end
 
             @_setup_block
