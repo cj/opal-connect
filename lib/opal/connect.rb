@@ -38,18 +38,7 @@ module Opal
         end
 
         unless block_given?
-          options[:setup_blocks].each do |b|
-            klass = Class.new do
-              include Opal::Connect
-
-              class << self
-                attr_accessor :class_name
-              end
-            end
-            klass.class_name = b[:klass].name
-
-            klass.instance_exec(&b[:block])
-          end
+          options[:setup_blocks].each { |b| b[:klass].instance_exec(&b[:block]) }
         end
       end
 

@@ -42,7 +42,7 @@ module Opal
           end
 
           def cache
-            @cache ||= (Connect.templates[self.class_name] ||= {})
+            @cache ||= (Connect.templates[self.name] ||= {})
           end
 
           def html(scope = false, &block)
