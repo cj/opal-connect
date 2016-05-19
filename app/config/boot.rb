@@ -16,3 +16,5 @@ Unreloader.require './lib/opal/connect.rb'
 Unreloader.require 'app/config/connect'
 Unreloader.require 'app'
 Unreloader.require 'app/components/**/*.rb'
+
+Opal::Connect.setup

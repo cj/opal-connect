@@ -9,7 +9,7 @@ class App < Roda
     gzip: true,
     js: { connect: [ 'opal.js', 'connect.js' ] }
 
-  use Rack::LiveReload
+  # use Rack::LiveReload
 
   route do |r|
     r.assets

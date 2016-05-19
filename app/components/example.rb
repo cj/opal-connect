@@ -3,7 +3,7 @@ class App
     class Example
       include Opal::Connect
 
-      def display
+      setup do
         dom.set! html! {
           html do
             head do
@@ -15,7 +15,9 @@ class App
             end
           end
         }
+      end unless RUBY_ENGINE == 'opal'
 
+      def display
         if RUBY_ENGINE == 'opal'
           dom.find('body').append 'cow'
         else
