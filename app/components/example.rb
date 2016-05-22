@@ -15,16 +15,23 @@ class App
             end
           end
         }
+
+        dom.find('html').append assets([:js, :connect])
+
+        dom.save!
       end unless RUBY_ENGINE == 'opal'
 
       def display
         if RUBY_ENGINE == 'opal'
           dom.find('body').append 'cow'
-        else
-          dom.find('html').append assets([:js, :connect])
         end
 
         dom
+      end
+
+      def moo
+        dom.find('body').append 'cow'
+        'cow'
       end
     end
   end

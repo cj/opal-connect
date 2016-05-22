@@ -1,7 +1,9 @@
 require 'opal-connect'
 
 Opal::Connect.setup do
-  options[:plugins]     = [ :server, :html, :dom, :events, :scope ]
+  options[:plugins]     = [ :server, :html, :dom, :events ]
   options[:livereload]  = true
+
+  plugin :scope, App.new('')
 end
 

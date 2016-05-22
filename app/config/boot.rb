@@ -1,4 +1,4 @@
-$:.unshift './app'
+$:.unshift Dir.pwd
 $:.unshift './lib'
 
 require 'bundler'

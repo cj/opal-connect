@@ -1,11 +1,3 @@
-if RUBY_ENGINE == 'opal'
-  `require("expose?$!expose?jQuery!jquery/dist/jquery.min.js")`;
-else
-  require 'oga'
-end
-
-require 'opal-jquery'
-
 module Opal
   module Connect
     module ConnectPlugins
@@ -164,14 +156,24 @@ module Opal
               end
             end
 
-            def text(content)
-              if node.respond_to?(:inner_text)
-                node.inner_text = content
-              else
-                node.each { |n| n.inner_text = content }
-              end
+            def text(content = false)
+              if content
+                if node.respond_to?(:inner_text)
+                  node.inner_text = content
+                else
+                  node.each { |n| n.inner_text = content }
+                end
 
-              self
+                self
+              else
+                if node.respond_to?(:inner_text)
+                  node.inner_text
+                else
+                  text = ''
+                  node.each { |n| text << n.inner_text }
+                  text
+                end
+              end
             end
 
             def attr(key, value = false)

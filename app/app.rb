@@ -7,7 +7,10 @@ class App < Roda
     js_dir: '',
     group_subdirs: false,
     gzip: true,
-    js: { connect: [ 'opal.js', 'connect.js' ] }
+    js: {
+      connect: [ 'opal.js', 'connect.js' ],
+      rspec: 'rspec.js'
+    }
 
   # use Rack::LiveReload
 
@@ -16,6 +19,14 @@ class App < Roda
 
     r.root do
       Components::Example.scope(self).render :display
+    end
+
+    r.on "rspec" do
+      r.on "iframe" do
+        Components::RSpec.scope(self).iframe
+      end
+
+      Components::RSpec.scope(self).render :display
     end
   end
 end

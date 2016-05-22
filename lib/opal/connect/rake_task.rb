@@ -2,7 +2,6 @@ module Opal
   module Connect
     class RakeTask
       include Rake::DSL if defined? Rake::DSL
-      STUBS = %w'opal native promise console base64 json'
 
       def initialize(name = 'webpack', opts = {})
         namespace name do
@@ -16,7 +15,7 @@ module Opal
 
           envs = ENV.to_h.merge({
             BUNDLE_BIN: true,
-            CONNECT_STUBS: STUBS.concat(Opal::Config.stubbed_files.to_a).join(','),
+            CONNECT_STUBS: "#{Opal::Connect.stubbed_files.join(',')},opal-connect,opal-jquery,opal-rspec",
             OPAL_LOAD_PATH: Opal.paths.join(":"),
             OPAL_USE_BUNDLER: true
           }).inject({}) { |env, (k, v)| env[k.to_s] = v.to_s; env }
@@ -39,9 +38,9 @@ module Opal
         version      = File.exist?(version_path) ? File.read(version_path) : false
 
         if !File.exist?("#{file_path}/opal.js") || !version || (version && version != Opal::VERSION)
-          builder   = Opal::Builder.new
-          build_str = STUBS.map { |stub| "require '#{stub}'" }.join(";")
-          builder.build_str(build_str, '(inline)', { dynamic_require_severity: :ignore })
+          builder   = Opal::Builder.new({ stubs: Opal::Config.stubbed_files.to_a })
+          build_str = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+          builder.build_str(build_str, '(inline)')
           File.write version_path, Opal::VERSION
           File.write "#{file_path}/opal.js", builder.to_s
         end

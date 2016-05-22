@@ -1,11 +1,20 @@
-const path             = require("path");
-const LiveReloadPlugin = require('webpack-livereload-plugin');
-const stubs            = process.env.CONNECT_STUBS.split(',');
+const path              = require("path");
+const LiveReloadPlugin  = require('webpack-livereload-plugin');
+const stubs             = process.env.CONNECT_STUBS.split(',');
+const WatchIgnorePlugin = require("webpack").WatchIgnorePlugin;
 
 module.exports = {
+  resolve: {
+    extensions: ['', '.js', '.css', '.rb'],
+    alias: {
+      app: path.resolve(__dirname, "app"),
+      spec: path.resolve(__dirname, "spec")
+    }
+  },
   entry: {
-    opal: './.connect/opal.js',
+    opal: ['./.connect/opal.js', './.connect/connect.js'],
     connect: './.connect/entry.rb',
+    rspec: './.connect/rspec.js'
   },
   output: {
     path: path.resolve(__dirname, ".connect", "output"),
@@ -15,15 +24,15 @@ module.exports = {
     test: /\.rb$/,
     loaders: [
       {
-        exclude: /node_modules|\.connect\/(opal|cache)/,
+        exclude: /node_modules|\.connect\/(opal|cache|connect|rspec|output)/,
         loader: "opal-webpack",
         query: { dynamic_require_severity: 'ignore' }
       }
     ]
   },
-  watchOptions: { poll: true },
+  // watchOptions: { poll: true, lazy: true },
   plugins: [
-    new LiveReloadPlugin({ ignore: '.connect' })
+    new LiveReloadPlugin({ ignore: '.connect' }),
   ],
   opal: {
     stubs: stubs,

@@ -12,7 +12,7 @@
     "expose-loader": "^0.7.1",
     "jquery": "^2.2.3",
     "livereload": "^0.4.1",
-    "opal-webpack": "1.0.6",
+    "opal-webpack": "1.0.8",
     "webpack": "2.1.0-beta.7",
     "webpack-livereload-plugin": "^0.8.1"
   }
