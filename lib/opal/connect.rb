@@ -40,6 +40,10 @@ module Opal
         STUBS.concat(Opal::Config.stubbed_files.to_a)
       end
 
+      def files
+        @_files ||= { connect: ['require "opal-connect"', Connect::VERSION] }
+      end
+
       def setup(&block)
         if block_given?
           instance_exec(&block)
@@ -55,7 +59,7 @@ module Opal
       def included(klass)
         if RUBY_ENGINE != 'opal'
           file = caller[0][/[^:]*/].sub(Dir.pwd, '')[1..-1]
-          files << file unless files.include?(file)
+          included_files << file unless files.include?(file)
         end
 
         klass.extend ConnectPlugins::Base::ClassMethods
@@ -216,13 +220,13 @@ module Opal
           end
 
           if RUBY_ENGINE != 'opal'
-            def files
-              @files ||= []
+            def included_files
+              @_included_files ||= []
             end
 
-            def build(code)
+            def build(code, stubs = false)
               Opal::Builder.new(
-                stubs: Connect.stubbed_files,
+                stubs: stubs || Connect.stubbed_files,
                 compiler_options: { dynamic_require_severity: :ignore }
               ).build_str(code, '(inline)').to_s
             end
@@ -244,12 +248,12 @@ module Opal
 
             def write_entry_file(klass = false, method = false, *options)
               path           = "#{Dir.pwd}/.connect"
-              files          = Connect.files.dup.uniq.map { |file| "require '#{file}'" }.join(';')
+              files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join(';')
               entry          = Connect.options[:entry]
               client_options = Base64.encode64 Connect.client_options.to_json
               plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join(';')
 
-              code = %{
+              entry_code = %{
                 require 'opal-connect'
                 #{plugins}
                 options = JSON.parse(Base64.decode64('#{client_options}'))
@@ -261,26 +265,20 @@ module Opal
                 Opal::Connect.setup
               }
 
-              FileUtils.mkdir_p(File.dirname(path))
-              File.write("#{path}/entry.rb", code)
+              FileUtils.mkdir_p(path)
+              File.write("#{path}/entry.rb", entry_code)
 
-              unless File.exist? "#{path}/connect.js"
-                File.write("#{path}/connect.js", build('require "opal-connect"'))
-              end
-
-              write_rspec_file
+              Connect.files.each { |name, (code, version)| write_file name, code, version }
             end
 
-            def write_rspec_file
-              require 'opal-rspec'
+            def write_file(name, code, current_version, stubs = false)
+              path    = "#{Dir.pwd}/.connect"
+              version_path = "#{path}/#{name}_version"
+              version      = File.exist?(version_path) ? File.read(version_path) : false
 
-              Opal.append_path "#{Dir.pwd}/spec"
-
-              path        = "#{Dir.pwd}/.connect"
-              connect_dir = File.dirname(__FILE__)
-
-              unless File.exist? "#{path}/rspec.js"
-                File.write("#{path}/rspec.js", build(File.read(File.expand_path('connect/rspec.rb', connect_dir))))
+              if !File.exist?("#{path}/#{name}.js") || !version || (version && version != current_version)
+                File.write version_path, current_version
+                File.write("#{path}/#{name}.js", build(code, stubs))
               end
             end
 

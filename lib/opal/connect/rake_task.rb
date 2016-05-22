@@ -11,7 +11,9 @@ module Opal
 
           Opal.append_path Dir.pwd
 
-          write_opal_file
+          code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+          stubs = Opal::Config.stubbed_files.to_a
+          Opal::Connect.write_file(:opal, code, Opal::VERSION, stubs)
 
           envs = ENV.to_h.merge({
             BUNDLE_BIN: true,
@@ -29,20 +31,6 @@ module Opal
           task :build do
             exec(envs, 'webpack --progress')
           end
-        end
-      end
-
-      def write_opal_file
-        file_path    = "#{Dir.pwd}/.connect"
-        version_path = "#{file_path}/opal_version"
-        version      = File.exist?(version_path) ? File.read(version_path) : false
-
-        if !File.exist?("#{file_path}/opal.js") || !version || (version && version != Opal::VERSION)
-          builder   = Opal::Builder.new({ stubs: Opal::Config.stubbed_files.to_a })
-          build_str = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
-          builder.build_str(build_str, '(inline)')
-          File.write version_path, Opal::VERSION
-          File.write "#{file_path}/opal.js", builder.to_s
         end
       end
     end
