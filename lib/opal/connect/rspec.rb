@@ -46,7 +46,16 @@ RSpec.configure do |config|
   config.include RSpecHelpers
 
   if RUBY_ENGINE == 'opal'
+    config.formatter = ::Opal::RSpec::BrowserFormatter
     config.before { dom.find('body').append html! { iframe id: 'rspec-iframe' } }
     config.after  { dom.find('#rspec-iframe').remove }
   end
+end
+
+if RUBY_ENGINE == 'opal'
+  %x{
+    var testsContext = require.context("spec", true, /_spec\.rb$/);
+    testsContext.keys().forEach(testsContext);
+    Opal.RSpec.$$scope.Core.Runner.$autorun();
+  }
 end

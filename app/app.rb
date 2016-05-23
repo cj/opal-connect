@@ -22,11 +22,7 @@ class App < Roda
     end
 
     r.on "rspec" do
-      r.on "iframe" do
-        Components::RSpec.scope(self).iframe
-      end
-
-      Components::RSpec.scope(self).render :display
+      Opal::Connect.run_rspec
     end
   end
 end

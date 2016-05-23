@@ -9,8 +9,6 @@ module Opal
 
           Opal::Connect.write_entry_file
 
-          Opal.append_path Dir.pwd
-
           code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
           stubs = Opal::Config.stubbed_files.to_a
           Opal::Connect.write_file(:opal, code, Opal::VERSION, stubs)

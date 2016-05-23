@@ -46,6 +46,8 @@ module Opal
 
       def setup(&block)
         if block_given?
+          Opal.append_path Dir.pwd unless RUBY_ENGINE == 'opal'
+
           instance_exec(&block)
           # make sure we include the default plugins with connect
           options[:plugins].each { |plug| Connect.plugin plug }
@@ -280,6 +282,10 @@ module Opal
                 File.write version_path, current_version
                 File.write("#{path}/#{name}.js", build(code, stubs))
               end
+            end
+
+            def read_file(file)
+              File.read "#{Dir.pwd}/.connect/#{file}"
             end
 
             def plugin_paths
