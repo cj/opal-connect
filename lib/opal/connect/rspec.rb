@@ -1,12 +1,3 @@
-class IO
-  def write(string)
-    require 'console'
-    $console.log(string)
-  end
-end
-
-require 'opal/rspec'
-
 if RUBY_ENGINE == 'opal'
   module Opal
     module Connect
@@ -34,9 +25,9 @@ if RUBY_ENGINE == 'opal'
 end
 
 module RSpecHelpers
-  include Opal::Connect
+  include Opal::Connect::ConnectPlugins::HTML::InstanceMethods
 
-  def dom
+  def rspec_dom
     Opal::Connect::ConnectPlugins::Dom::Instance.new('html')
   end
 end
@@ -44,18 +35,11 @@ end
 RSpec.configure do |config|
   config.extend RSpecHelpers
   config.include RSpecHelpers
+  config.before(:suite) { Opal::Connect.setup }
 
   if RUBY_ENGINE == 'opal'
     config.formatter = ::Opal::RSpec::BrowserFormatter
-    config.before { dom.find('body').append html! { iframe id: 'rspec-iframe' } }
-    config.after  { dom.find('#rspec-iframe').remove }
+    config.before { rspec_dom.find('body').append html! { iframe id: 'rspec-iframe' } }
+    config.after  { rspec_dom.find('#rspec-iframe').remove }
   end
-end
-
-if RUBY_ENGINE == 'opal'
-  %x{
-    var testsContext = require.context("spec", true, /_spec\.rb$/);
-    testsContext.keys().forEach(testsContext);
-    Opal.RSpec.$$scope.Core.Runner.$autorun();
-  }
 end

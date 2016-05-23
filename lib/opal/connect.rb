@@ -28,7 +28,7 @@ module Opal
           plugins: [],
           javascript: [],
           requires: [],
-          setup_blocks: []
+          setup_blocks: {},
         )
       end
 
@@ -54,7 +54,10 @@ module Opal
         end
 
         unless block_given?
-          options[:setup_blocks].each { |b| b[:klass].instance_exec(&b[:block]) }
+          options[:setup_blocks].each do |klass, b|
+            klass.instance_exec(&b)
+            options[:setup_blocks].delete(klass)
+          end
         end
       end
 
@@ -174,10 +177,7 @@ module Opal
           def setup(&block)
             if block_given?
               @_setup_block = block
-              Connect.options[:setup_blocks] << {
-                block: @_setup_block,
-                klass: self
-              }
+              Connect.options[:setup_blocks][self] = @_setup_block
             end
 
             @_setup_block
