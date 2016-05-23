@@ -34,6 +34,7 @@ module Opal
           end
 
           def cache
+            # fix:  instead of {} it needs to use ConnectCache.new
             @cache ||= (Connect.templates[self.name] ||= {})
           end
 

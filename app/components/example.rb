@@ -23,6 +23,7 @@ class App
 
       def display
         if RUBY_ENGINE == 'opal'
+          puts Opal::Connect.templates
           dom.find('body').append 'cow'
         end
 

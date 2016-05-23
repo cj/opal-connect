@@ -5,6 +5,6 @@ Opal::Connect.setup do
   options[:livereload]  = true
 
   plugin :scope, App.new('')
-  plugin :rspec
+  plugin :rspec, code: -> { assets([:js, :connect]) + assets([:js, :rspec]) }
 end
 

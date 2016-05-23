@@ -1,14 +1,16 @@
+require 'opal-rspec'
+
 module Opal::Connect
   module ConnectPlugins
     module ConnectRSpec
       def self.configure(connect, options = {})
-        require 'opal-rspec'
+        opts = connect.options[:rspec] = { folder: "#{Dir.pwd}/spec"}.merge options
 
         unless RUBY_ENGINE == 'opal'
           require 'rspec'
-
-          ::Opal.append_path options[:folder] || "#{Dir.pwd}/spec"
-          connect_dir = "#{File.dirname(__FILE__)}/../"
+          ::Opal.append_path opts[:folder]
+          $:.unshift opts[:folder]
+          version     = "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
           code        = %{
             class IO
               def write(string)
@@ -18,48 +20,55 @@ module Opal::Connect
             end
 
             require 'opal/rspec'
+
+            %x{
+              var testsContext = require.context("spec", true, /_spec\.rb$/);
+              testsContext.keys().forEach(testsContext);
+              Opal.RSpec.$$scope.Core.Runner.$autorun();
+            }
           }
-          File.read(File.expand_path('rspec.rb', connect_dir))
-          version     = "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
 
           Opal::Connect.files[:rspec] = [code, version]
         end
-
-        connect.options[:rspec] = options
       end
 
       module ConnectClassMethods
         def run_rspec
-          Opal::Connect.write_entry_file
+          read, write = IO.pipe
 
-          code         = Opal::Connect.options[:rspec][:code]
-          opal_code    = Opal::Connect.read_file 'output/opal.js'
-          connect_code = Opal::Connect.read_file 'output/connect.js'
-          rspec_code   = Opal::Connect.read_file('output/rspec.js')
-            .gsub(/<script>/, '\<script\>')
-            .gsub(/<\/script>/, '\</script\>')
+          pid = fork do
+            read.close
 
-          rspec = Opal::Connect.build(%{
-            require 'spec/plugins/dom_spec'
-            `Opal.RSpec.$$scope.Core.Runner.$autorun()`
-          })
+            options = Opal::Connect.options[:rspec]
 
-          code = Class.new { include Opal::Connect }.instance_exec(&code) if code
+            Dir["#{options[:folder]}/**/*_spec.rb"].each { |file| load file }
+            Opal::Connect.setup
+            Opal::Connect.write_entry_file(self)
 
-          html! {
-            html do
-              head { meta charset: 'utf-8' }
-              body {}
+            code = Class.new { include Opal::Connect }.instance_exec(&options[:code])
 
-              script opal_code, type: "text/javascript"
-              script connect_code, type: "text/javascript"
-              div code if code
-              script rspec_code, type: "text/javascript"
-              script rspec, type: "text/javascript"
-            end
-          }
+            string = html! {
+              html do
+                head do
+                  meta charset: 'utf-8'
+                end
+
+                body code
+
+              end
+            }
+
+            Marshal.dump(string, write)
+            exit!(0) # skips exit handlers.
+          end
+
+          write.close
+          result = read.read
+          Process.wait(pid)
+          raise "child failed" if result.empty?
+          Marshal.load(result)
         end
-      end
+      end unless RUBY_ENGINE == 'opal'
     end
 
     register_plugin :rspec, ConnectRSpec

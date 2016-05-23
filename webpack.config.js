@@ -32,7 +32,7 @@ module.exports = {
   },
   // watchOptions: { poll: true, lazy: true },
   plugins: [
-    new LiveReloadPlugin({ ignore: '.connect' }),
+    new LiveReloadPlugin({ ignore: /entry\.rb/ }),
   ],
   opal: {
     stubs: stubs,

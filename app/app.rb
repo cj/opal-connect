@@ -12,6 +12,8 @@ class App < Roda
       rspec: 'rspec.js'
     }
 
+  use Rack::LiveReload
+
   route do |r|
     r.assets
 

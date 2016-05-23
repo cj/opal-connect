@@ -26,6 +26,7 @@ module Opal
           livereload: false,
           url: '/connect',
           plugins: [],
+          plugins_loaded: [],
           javascript: [],
           requires: [],
           setup_blocks: {},
@@ -49,14 +50,20 @@ module Opal
           Opal.append_path Dir.pwd unless RUBY_ENGINE == 'opal'
 
           instance_exec(&block)
+
           # make sure we include the default plugins with connect
-          options[:plugins].each { |plug| Connect.plugin plug }
+          options[:plugins].each do |plug|
+            unless options[:plugins_loaded].include? plug
+              options[:plugins_loaded] << plug
+              Connect.plugin(plug)
+            end
+          end
         end
 
         unless block_given?
           options[:setup_blocks].each do |klass, b|
             klass.instance_exec(&b)
-            options[:setup_blocks].delete(klass)
+            options[:setup_blocks].delete klass
           end
         end
       end
@@ -64,7 +71,7 @@ module Opal
       def included(klass)
         if RUBY_ENGINE != 'opal'
           file = caller[0][/[^:]*/].sub(Dir.pwd, '')[1..-1]
-          included_files << file unless files.include?(file)
+          included_files << file unless files.include?(file) || file[/^spec/]
         end
 
         klass.extend ConnectPlugins::Base::ClassMethods
@@ -195,6 +202,7 @@ module Opal
             raise ConnectError, "Cannot add a plugin to a frozen Connect class" if RUBY_ENGINE != 'opal' && frozen?
 
             if plugin.is_a?(Symbol)
+              Connect.options[:plugins_loaded] << plugin
               Connect.options[:plugins] << plugin unless Connect.options[:plugins].include? plugin
               plugin = ConnectPlugins.load_plugin(plugin)
             end
@@ -236,12 +244,8 @@ module Opal
             def javascript(klass, method, *opts)
               return unless klass
 
-              js = []
-              options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) }
-
               %{
                 Document.ready? do
-                  #{js.join(';')}
                   klass = #{klass.class.name}.new
                   klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})
                 end
@@ -249,11 +253,14 @@ module Opal
             end
 
             def write_entry_file(klass = false, method = false, *options)
+              js             = []
               path           = "#{Dir.pwd}/.connect"
               files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join(';')
               entry          = Connect.options[:entry]
               client_options = Base64.encode64 Connect.client_options.to_json
               plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join(';')
+
+              Connect.options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) }
 
               entry_code = %{
                 require 'opal-connect'
@@ -265,22 +272,24 @@ module Opal
                 # make sure we include the default plugins with connect
                 Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug }
                 Opal::Connect.setup
+                #{js.join(';')}
               }
 
               FileUtils.mkdir_p(path)
               File.write("#{path}/entry.rb", entry_code)
 
-              Connect.files.each { |name, (code, version)| write_file name, code, version }
+              Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
             end
 
             def write_file(name, code, current_version, stubs = false)
-              path    = "#{Dir.pwd}/.connect"
+              path         = "#{Dir.pwd}/.connect"
               version_path = "#{path}/#{name}_version"
               version      = File.exist?(version_path) ? File.read(version_path) : false
+              save_path    = "#{path}/#{name}.js"
 
-              if !File.exist?("#{path}/#{name}.js") || !version || (version && version != current_version)
+              if !File.exist?(save_path) || !version || (version && version != current_version)
                 File.write version_path, current_version
-                File.write("#{path}/#{name}.js", build(code, stubs))
+                File.write(save_path, build(code, stubs))
               end
             end
 

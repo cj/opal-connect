@@ -6,8 +6,6 @@ require './app/config/boot'
 require 'opal-connect'
 require 'opal/connect/rake_task'
 
-Opal::Connect.write_entry_file
-
 Opal::Connect::RakeTask.new('webpack')
 
 require 'opal/rspec/rake_task'
