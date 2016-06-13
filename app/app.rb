@@ -2,17 +2,18 @@ require_relative 'config/connect'
 
 class App < Roda
   plugin :assets,
-    path: '.connect/output',
+    path: '',
     css_dir: '',
     js_dir: '',
     group_subdirs: false,
     gzip: true,
+    js_opts: { builder: Opal::Connect.builder },
     js: {
-      connect: [ 'opal.js', 'connect.js' ],
-      rspec: 'rspec.js'
+      app: ['node_modules/jquery/dist/jquery.js', '.connect/opal.js', '.connect/connect.js', '.connect/entry.rb'],
+      rspec: ['.connect/rspec.js', '.connect/rspec_tests.js']
     }
 
-  use Rack::LiveReload
+  # use Rack::LiveReload
 
   route do |r|
     r.assets

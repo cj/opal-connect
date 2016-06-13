@@ -1,35 +1,8 @@
-require 'opal-rspec'
-
 module Opal::Connect
   module ConnectPlugins
     module ConnectRSpec
       def self.configure(connect, options = {})
-        opts = connect.options[:rspec] = { folder: "#{Dir.pwd}/spec"}.merge options
-
-        unless RUBY_ENGINE == 'opal'
-          require 'rspec'
-          ::Opal.append_path opts[:folder]
-          $:.unshift opts[:folder]
-          version     = "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
-          code        = %{
-            class IO
-              def write(string)
-                require 'console'
-                $console.log(string)
-              end
-            end
-
-            require 'opal/rspec'
-
-            %x{
-              var testsContext = require.context("spec", true, /_spec\.rb$/);
-              testsContext.keys().forEach(testsContext);
-              Opal.RSpec.$$scope.Core.Runner.$autorun();
-            }
-          }
-
-          Opal::Connect.files[:rspec] = [code, version]
-        end
+        connect.options[:rspec] = { folder: "spec"}.merge options
       end
 
       module ConnectClassMethods
@@ -40,6 +13,28 @@ module Opal::Connect
             read.close
 
             options = Opal::Connect.options[:rspec]
+
+            ::Opal.append_path "./#{options[:folder]}"
+            $:.unshift "./#{options[:folder]}"
+
+            require 'rspec'
+            require 'opal-rspec'
+            rspec_requires = []
+            version        = "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
+
+            Dir.glob("./#{options[:folder]}/**/*_spec.rb").each { |file| rspec_requires << "require '#{file.sub('./', '')}'" }
+
+            code = %{
+              require 'opal/connect/puts'
+              require 'opal/rspec'
+            }
+
+            Opal::Connect.write_file :rspec, code, version
+
+            File.write "#{Dir.pwd}/.connect/rspec_tests.js", build(%{
+              #{rspec_requires.join(';')}
+              ::RSpec::Core::Runner.autorun
+            })
 
             Dir["#{options[:folder]}/**/*_spec.rb"].each { |file| load file }
             Opal::Connect.setup

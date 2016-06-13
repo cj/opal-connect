@@ -7,6 +7,7 @@ gem 'rack-unreloader', '1.5.0'
 gem 'rack-livereload'
 gem 'rspec'
 gem 'opal-rspec', '0.5.0'
+gem 'opal', '0.10.0.beta5'
 gem 'pry'
 gem 'awesome_print'
 

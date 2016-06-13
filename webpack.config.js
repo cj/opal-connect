@@ -12,8 +12,8 @@ module.exports = {
     }
   },
   entry: {
-    opal: ['./.connect/opal.js', './.connect/connect.js'],
-    connect: './.connect/entry.rb',
+    connect: ['./.connect/opal.js', './.connect/connect.js'],
+    app: './.connect/entry.rb',
     rspec: './.connect/rspec.js'
   },
   output: {

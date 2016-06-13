@@ -3,7 +3,8 @@ require 'base64'
 require "opal/connect/version"
 
 if RUBY_ENGINE == 'opal'
-  `require("expose?$!expose?jQuery!jquery/dist/jquery.min.js")`;
+  `if(typeof require === 'undefined') { require = function(){} }`
+  `require("expose?$!expose?jQuery!jquery/dist/jquery.min.js")`
   require 'opal/connect/puts'
 else
   require 'oga'
@@ -46,7 +47,7 @@ module Opal
       end
 
       def setup(&block)
-        if block_given?
+        if RUBY_ENGINE != 'opal' && block_given?
           Opal.append_path Dir.pwd unless RUBY_ENGINE == 'opal'
 
           instance_exec(&block)
@@ -234,11 +235,15 @@ module Opal
               @_included_files ||= []
             end
 
-            def build(code, stubs = false)
+            def builder(stubs = false)
               Opal::Builder.new(
                 stubs: stubs || Connect.stubbed_files,
                 compiler_options: { dynamic_require_severity: :ignore }
-              ).build_str(code, '(inline)').to_s
+              )
+            end
+
+            def build(code, stubs = false)
+              builder(stubs).build_str(code, '(inline)').to_s
             end
 
             def javascript(klass, method, *opts)

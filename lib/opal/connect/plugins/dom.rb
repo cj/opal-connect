@@ -177,6 +177,10 @@ module Opal
               end
             end
 
+            def val(value = false)
+              self.attr('value', value)
+            end
+
             def attr(key, value = false)
               if value
                 value = value.to_s
