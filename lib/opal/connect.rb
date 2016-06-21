@@ -64,8 +64,9 @@ module Opal
         unless block_given?
           options[:setup_blocks].each do |klass, b|
             klass.instance_exec(&b)
-            options[:setup_blocks].delete klass
           end
+
+          options[:setup_blocks] = {}
         end
       end
 
@@ -265,7 +266,7 @@ module Opal
               client_options = Base64.encode64 Connect.client_options.to_json
               plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join(';')
 
-              Connect.options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) }
+              Connect.options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) } if klass
 
               entry_code = %{
                 require 'opal-connect'
