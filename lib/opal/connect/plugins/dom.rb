@@ -116,7 +116,7 @@ module Opal
           def save template_name = false, remove = true
             if template_name
               cache[:"#{template_name}"] = self.to_html
-              dom.remove if remove
+              dom.remove if !dom.is_a?(Oga::XML::Document) && remove
             else
               cache[:html] = self.to_html
             end

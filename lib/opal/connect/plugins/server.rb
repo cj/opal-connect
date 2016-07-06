@@ -24,8 +24,9 @@ module Opal
           end
 
           def server(method = false, *args, &block)
-            if RUBY_ENGINE != 'opal'
-
+            if RUBY_ENGINE == 'opal'
+              self.new.server(method, *args)
+            else
               if method
                 include method
               else
