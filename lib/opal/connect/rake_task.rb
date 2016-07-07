@@ -22,7 +22,7 @@ module Opal
       def initialize_connect
         return unless defined? Opal.append_path
 
-        Opal::Connect.write_entry_file
+        Opal::Connect.write_entry_file(self)
 
         code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
         stubs = Opal::Config.stubbed_files.to_a
