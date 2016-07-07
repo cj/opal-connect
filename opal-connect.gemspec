@@ -18,7 +18,7 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "opal", ">= 0.10.0"
+  spec.add_dependency "opal", "< 0.11.0"
   spec.add_dependency "opal-jquery", ">= 0.4.2"
   spec.add_dependency "oga", ">= 2.2"
 
