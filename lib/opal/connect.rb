@@ -250,8 +250,12 @@ module Opal
             def javascript(klass, method, *opts)
               return unless klass
 
+              js = []
+              options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) }
+
               %{
                 Document.ready? do
+                  #{js.join(';')}
                   klass = #{klass.class.name}.new
                   klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})
                 end
