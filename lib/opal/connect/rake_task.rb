@@ -17,16 +17,61 @@ module Opal
             exec(envs, 'webpack --progress')
           end
         end
+
+        namespace 'rspec' do
+          desc "RSpec Browser Tests"
+          task :browser do
+            begin
+              path    = File.expand_path('../../../../phantom.js', __FILE__)
+              options = Opal::Connect.options[:rspec]
+              @url    = "http://#{options[:host]}:#{options[:port]}/#{options[:path]}"
+
+              server = Thread.new do
+                Thread.current.abort_on_exception = true
+                Rack::Server.start(
+                  config: options[:config],
+                  Host: options[:host],
+                  Port: options[:port],
+                  AccessLog: []
+                )
+              end
+
+              wait_for_server
+
+              `#{options[:phantomjs_bin] || 'phantomjs'} #{path} #{@url}`
+            ensure
+              server.kill
+            end
+          end
+        end
+      end
+
+      def wait_for_server
+        # avoid retryable dependency
+        tries = 0
+        up = false
+        uri =  URI.parse @url
+
+        while tries < 4 && !up
+          tries += 1
+          sleep 0.5
+          begin
+            # Using TCPSocket, not net/http open because executing the HTTP GET / will incur a decent delay just to check if the server is up
+            # in order to better communicate to the user what is going on, save the actual HTTP request for the phantom/node run
+            # the only objective here is to see if the Rack server has started
+            socket = TCPSocket.new uri.hostname, uri.port
+            up = true
+            socket.close
+          rescue Errno::ECONNREFUSED
+            # server not up yet
+          end
+        end
       end
 
       def initialize_connect
         return unless defined? Opal.append_path
 
         Opal::Connect.write_entry_file(self)
-
-        code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
-        stubs = Opal::Config.stubbed_files.to_a
-        Opal::Connect.write_file(:opal, code, Opal::VERSION, stubs)
 
         ENV.to_h.merge({
           BUNDLE_BIN: true,

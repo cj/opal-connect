@@ -38,7 +38,6 @@ RSpec.configure do |config|
   config.before(:suite) { Opal::Connect.setup }
 
   if RUBY_ENGINE == 'opal'
-    config.formatter = ::Opal::RSpec::BrowserFormatter
     config.before { rspec_dom.find('body').append html! { iframe id: 'rspec-iframe' } }
     config.after  { rspec_dom.find('#rspec-iframe').remove }
   end

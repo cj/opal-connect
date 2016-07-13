@@ -62,8 +62,16 @@ module Opal
         end
 
         unless block_given?
-          options[:setup_blocks].each do |klass, b|
-            klass.instance_exec(&b)
+          unless RUBY_ENGINE == 'opal'
+            opal_code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+            opal_stubs = Opal::Config.stubbed_files.to_a
+            Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
+
+            Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
+          end
+
+          options[:setup_blocks].each do |klass, blocks|
+            blocks.each { |b| klass.instance_exec(&b) }
           end
 
           options[:setup_blocks] = {}
@@ -88,7 +96,9 @@ module Opal
       # Create a new thread safe cache.
       def initialize(options = false)
         @mutex = Mutex.new if RUBY_ENGINE != 'opal'
-        @hash = options || {}
+        @hash  = options || {}
+        @hash.each { |k, v| @hash[k] = ConnectCache.new(v) if v.is_a?(Hash) }
+        @hash
       end
 
       # Make getting value from underlying hash thread safe.
@@ -99,6 +109,7 @@ module Opal
           @mutex.synchronize { @hash[key] }
         end
       end
+      alias get []
 
       # Make setting value in underlying hash thread safe.
       def []=(key, value)
@@ -108,9 +119,18 @@ module Opal
           @mutex.synchronize { @hash[key] = value }
         end
       end
+      alias set []=
 
       def to_json
-        @mutex.synchronize { @hash.to_json }
+        @mutex.synchronize do
+          json_hash = {}
+
+          @hash.each do |k, v|
+            json_hash[k] = v.kind_of?(ConnectCache) ? v.hash : v
+          end
+
+          json_hash.to_json
+        end
       end
 
       def hash
@@ -186,7 +206,7 @@ module Opal
           def setup(&block)
             if block_given?
               @_setup_block = block
-              Connect.options[:setup_blocks][self] = @_setup_block
+              (Connect.options[:setup_blocks][self] ||= []) << @_setup_block
             end
 
             @_setup_block
@@ -287,8 +307,6 @@ module Opal
 
               FileUtils.mkdir_p(path)
               File.write("#{path}/entry.rb", entry_code)
-
-              Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
             end
 
             def write_file(name, code, current_version, stubs = false)
@@ -296,6 +314,8 @@ module Opal
               version_path = "#{path}/#{name}_version"
               version      = File.exist?(version_path) ? File.read(version_path) : false
               save_path    = "#{path}/#{name}.js"
+
+              FileUtils.mkdir_p(path)
 
               if !File.exist?(save_path) || !version || (version && version != current_version)
                 File.write version_path, current_version

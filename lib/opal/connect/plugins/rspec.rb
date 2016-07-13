@@ -2,7 +2,13 @@ module Opal::Connect
   module ConnectPlugins
     module ConnectRSpec
       def self.configure(connect, options = {})
-        connect.options[:rspec] = { folder: "spec"}.merge options
+        connect.options[:rspec] = {
+          folder: "spec",
+          port: 3333,
+          host: 'localhost',
+          path: 'rspec',
+          config: './config.ru'
+        }.merge options
       end
 
       module ConnectClassMethods
@@ -32,6 +38,10 @@ module Opal::Connect
 
             File.write "#{Dir.pwd}/.connect/rspec_tests.js", build(%{
               #{rspec_requires.join(';')}
+              RSpec.configure do |config|
+                config.formatter = ::Opal::RSpec::BrowserFormatter
+                config.formatter = ::RSpec::Core::Formatters::ProgressFormatter
+              end
               RSpec::Core::Runner.autorun
             })
 
