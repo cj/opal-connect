@@ -23,6 +23,12 @@ module Opal
             (RUBY_ENGINE == 'opal' ? $store : store_opts[:data])[self.name] ||= ConnectCache.new
           end
         end
+
+        module InstanceMethods
+          def store
+            @_store ||= ConnectCache.new self.class.store.hash
+          end
+        end
       end
 
       register_plugin(:store, Store)

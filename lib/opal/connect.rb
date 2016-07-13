@@ -96,9 +96,9 @@ module Opal
       # Create a new thread safe cache.
       def initialize(options = false)
         @mutex = Mutex.new if RUBY_ENGINE != 'opal'
-        @hash  = options || {}
-        @hash.each { |k, v| @hash[k] = ConnectCache.new(v) if v.is_a?(Hash) }
-        @hash
+        hash  = options || {}
+        # make a copy of the hash passed so changes don't effect the one passed in.
+        @hash = Hash[hash.map{|k,v| [k, (v.is_a?(Hash) ? ConnectCache.new(v) : v)]}]
       end
 
       # Make getting value from underlying hash thread safe.
