@@ -8,6 +8,7 @@ gem 'rack-livereload'
 gem 'rspec'
 gem 'opal-connect-rspec'
 gem 'opal', '0.10.1'
+gem 'opal-rspec', '0.6.0.beta1'
 gem 'pry'
 gem 'awesome_print'
 

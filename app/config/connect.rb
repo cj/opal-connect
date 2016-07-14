@@ -5,6 +5,8 @@ Opal::Connect.setup do
   options[:livereload]  = true
 
   plugin :scope, App.new('')
-  plugin :rspec, assets: -> { assets(:js) }
+  plugin :rspec
+  plugin :sprockets,
+    jquery_path: 'node_modules/jquery/dist/jquery.js',
+    debug: true
 end
-

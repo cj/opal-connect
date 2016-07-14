@@ -1,13 +1,13 @@
 module Opal
   module Connect
     module ConnectPlugins
-      module Server
-        ConnectJavascript = -> do
-          %{Opal::Connect.server_methods = JSON.parse(
-            Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
-          );}
-        end
+      entry do
+        %{Opal::Connect.server_methods = JSON.parse(
+          Base64.decode64('#{Base64.encode64 Connect.server_methods.to_json}')
+        );}
+      end
 
+      module Server
         module ConnectClassMethods
           def server_methods
             @server_methods ||= ConnectCache.new

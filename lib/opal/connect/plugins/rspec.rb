@@ -10,6 +10,8 @@ module Opal::Connect
           config: './config.ru',
           glob: '**/*_spec.rb'
         }.merge options
+
+        connect.plugin :sprockets, append_paths: [connect.options[:rspec][:folder]]
       end
 
       module ConnectClassMethods
@@ -22,7 +24,6 @@ module Opal::Connect
             rspec_requires = []
             options        = Opal::Connect.options[:rspec]
 
-            Opal.append_path "./#{options[:folder]}"
             $:.unshift "./#{options[:folder]}"
 
             require 'rspec'
@@ -38,11 +39,15 @@ module Opal::Connect
             }, "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
 
             File.write "#{Dir.pwd}/.connect/rspec_tests.rb", %{
+              require 'opal/connect/rspec'
+
               RSpec.configure do |config|
                 config.formatter = ::Opal::RSpec::BrowserFormatter
                 config.formatter = ::RSpec::Core::Formatters::ProgressFormatter
               end
+
               #{rspec_requires.join(';')}
+
               RSpec::Core::Runner.autorun
             }
 
@@ -54,10 +59,9 @@ module Opal::Connect
               html do
                 head { meta charset: 'utf-8' }
                 body do
-                  div Class.new { include Opal::Connect }.instance_exec(&options[:assets])
-                  div ::Opal::Sprockets.javascript_include_tag('entry', sprockets: App::Sprockets, prefix: App::Prefix, debug: true)
-                  script src: '/connect/assets/rspec.js'
-                  div ::Opal::Sprockets.javascript_include_tag('rspec_tests', sprockets: App::Sprockets, prefix: App::Prefix, debug: true)
+                  div connect_include_tag
+                  div javascript_include_tag 'rspec.js'
+                  div javascript_include_tag 'rspec_tests'
                 end
               end
             }

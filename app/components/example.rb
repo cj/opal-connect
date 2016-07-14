@@ -16,15 +16,15 @@ class App
           end
         }
 
-        dom.find('html').append assets(:js)
-        dom.find('html').append ::Opal::Sprockets.javascript_include_tag('entry', sprockets: Sprockets, prefix: Prefix, debug: true)
+        # dom.find('html').append assets(:js)
+        dom.find('html').append connect_include_tag
 
         dom.save!
       end unless RUBY_ENGINE == 'opal'
 
       def display
         if RUBY_ENGINE == 'opal'
-          dom.find('body').appen 'cow'
+          dom.find('body').append 'cow'
         end
 
         dom

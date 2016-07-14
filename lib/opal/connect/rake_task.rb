@@ -19,8 +19,8 @@ module Opal
         end
 
         namespace 'rspec' do
-          desc "RSpec Browser Tests"
-          task :browser do
+          desc "RSpec Connect Tests"
+          task :connect do
             begin
               path    = File.expand_path('../../../../phantom.js', __FILE__)
               options = Opal::Connect.options[:rspec]
