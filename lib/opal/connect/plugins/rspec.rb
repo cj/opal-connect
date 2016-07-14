@@ -7,7 +7,8 @@ module Opal::Connect
           port: 3333,
           host: 'localhost',
           path: 'rspec',
-          config: './config.ru'
+          config: './config.ru',
+          glob: '**/*_spec.rb'
         }.merge options
       end
 
@@ -27,7 +28,7 @@ module Opal::Connect
             require 'rspec'
             require 'opal-rspec'
 
-            Dir.glob("./#{options[:folder]}/**/*_spec.rb").each do |file|
+            Dir.glob("./#{options[:folder]}/#{options[:glob]}").each do |file|
               rspec_requires << "require '#{file.sub('./', '')}'"
             end
 
@@ -36,29 +37,32 @@ module Opal::Connect
               require 'opal/rspec'
             }, "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
 
-            File.write "#{Dir.pwd}/.connect/rspec_tests.js", build(%{
-              #{rspec_requires.join(';')}
+            File.write "#{Dir.pwd}/.connect/rspec_tests.rb", %{
               RSpec.configure do |config|
                 config.formatter = ::Opal::RSpec::BrowserFormatter
                 config.formatter = ::RSpec::Core::Formatters::ProgressFormatter
               end
+              #{rspec_requires.join(';')}
               RSpec::Core::Runner.autorun
-            })
+            }
 
             Dir["#{options[:folder]}/**/*_spec.rb"].each { |file| load file }
             Opal::Connect.setup
             Opal::Connect.write_entry_file(self)
 
-            string = html! {
+            tmpl = html! {
               html do
                 head { meta charset: 'utf-8' }
-                body Class.new {
-                  include Opal::Connect
-                }.instance_exec(&options[:code])
+                body do
+                  div Class.new { include Opal::Connect }.instance_exec(&options[:assets])
+                  div ::Opal::Sprockets.javascript_include_tag('entry', sprockets: App::Sprockets, prefix: App::Prefix, debug: true)
+                  script src: '/connect/assets/rspec.js'
+                  div ::Opal::Sprockets.javascript_include_tag('rspec_tests', sprockets: App::Sprockets, prefix: App::Prefix, debug: true)
+                end
               end
             }
 
-            Marshal.dump(string, write)
+            Marshal.dump(tmpl, write)
             exit!(0) # skips exit handlers.
           end
 

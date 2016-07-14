@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'spec/spec_helper'
 
 describe 'components/example' do
   let(:example) { App::Components::Example.new }
