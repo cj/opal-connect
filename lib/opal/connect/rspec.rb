@@ -35,7 +35,6 @@ end
 RSpec.configure do |config|
   config.extend RSpecHelpers
   config.include RSpecHelpers
-  config.before(:suite) { Opal::Connect.setup }
 
   if RUBY_ENGINE == 'opal'
     config.before { rspec_dom.find('body').append html! { iframe id: 'rspec-iframe' } }

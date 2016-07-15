@@ -1,10 +1,15 @@
 require 'opal'
 require 'base64'
+require 'json'
 require "opal/connect/version"
 
 if RUBY_ENGINE == 'opal'
   require 'opal/connect/puts'
 else
+  unless File.exists?('.connect/entry.rb')
+    FileUtils.mkdir_p('.connect')
+    File.write '.connect/entry.rb', ''
+  end
   require 'oga'
   require 'opal/patch'
   Opal.append_path File.expand_path('../..', __FILE__).untaint
@@ -29,6 +34,8 @@ module Opal
           javascript:     [],
           requires:       [],
           setup_blocks:   {},
+          setup:        false,
+          run:          false
         )
       end
 
@@ -45,36 +52,27 @@ module Opal
       end
 
       def setup(&block)
-        if RUBY_ENGINE != 'opal' && block_given?
-          Opal.append_path Dir.pwd unless RUBY_ENGINE == 'opal'
+        Opal.append_path Dir.pwd
+        instance_exec(&block) if block_given?
+      end
 
-          instance_exec(&block)
-
-          # make sure we include the default plugins with connect
-          options[:plugins].each do |plug|
-            unless options[:plugins_loaded].include? plug
-              options[:plugins_loaded] << plug
-              Connect.plugin(plug)
-            end
-          end
+      def run
+        options[:setup_blocks].each do |klass, blocks|
+          blocks.each { |b| klass.instance_exec(&b) }
         end
 
-        unless block_given?
-          unless RUBY_ENGINE == 'opal'
-            write_entry_file
+        options[:setup_blocks] = ConnectCache.new
 
-            opal_code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
-            opal_stubs = Opal::Config.stubbed_files.to_a
-            Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
+        if !options[:run] && RUBY_ENGINE != 'opal'
+          write_entry_file
 
-            Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
-          end
+          opal_code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+          opal_stubs = Opal::Config.stubbed_files.to_a
+          Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
 
-          options[:setup_blocks].each do |klass, blocks|
-            blocks.each { |b| klass.instance_exec(&b) }
-          end
+          Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
 
-          options[:setup_blocks] = {}
+          options[:run] = true
         end
       end
 
@@ -197,6 +195,8 @@ module Opal
         module InstanceMethods
           if RUBY_ENGINE != 'opal'
             def render(method, *options, &block)
+              Connect.run
+
               %{#{public_send(method, *options, &block)}
                 <script>#{ Connect.build Connect.javascript(self, method, *options)}</script>}
             end
@@ -252,6 +252,10 @@ module Opal
             nil
           end
 
+          def plugins(*plugins)
+            plugins.each { |plugin| Connect.plugin plugin}
+          end
+
           if RUBY_ENGINE != 'opal'
             def included_files
               @_included_files ||= []
@@ -282,7 +286,9 @@ module Opal
               }
             end
 
-            def write_entry_file
+            def write_entry_file(entry_name = 'entry')
+              Opal.append_path Dir.pwd
+
               klass          = Class.new { include Opal::Connect }
               path           = "#{Dir.pwd}/.connect"
               files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join("\n")
@@ -300,13 +306,13 @@ module Opal
                 #{files}
                 # make sure we include the default plugins with connect
                 Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug }
-                Opal::Connect.setup
+                Opal::Connect.run
                 #{entry.join("\n")}
                 #{javascript(klass)}
               }
 
               FileUtils.mkdir_p(path)
-              File.write("#{path}/entry.rb", entry_code)
+              File.write("#{path}/#{entry_name}.rb", entry_code)
             end
 
             def write_file(name, code, current_version, stubs = false)

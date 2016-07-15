@@ -59,7 +59,7 @@ module Opal
 
         module InstanceMethods
           def cache
-            @cache ||= Connect.templates[self.class.name]
+            self.class.cache
           end
 
           def dom(selector = false)

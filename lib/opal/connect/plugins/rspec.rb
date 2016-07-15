@@ -52,14 +52,14 @@ module Opal::Connect
             }
 
             Dir["#{options[:folder]}/**/*_spec.rb"].each { |file| load file }
-            Opal::Connect.setup
-            Opal::Connect.write_entry_file
+            Opal::Connect.run
+            Opal::Connect.write_entry_file 'rspec_entry'
 
             tmpl = html! {
               html do
                 head { meta charset: 'utf-8' }
                 body do
-                  div connect_include_tag
+                  div javascript_include_tag 'rspec_entry'
                   div javascript_include_tag 'rspec.js'
                   div javascript_include_tag 'rspec_tests'
                 end
