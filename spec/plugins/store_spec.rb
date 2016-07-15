@@ -5,19 +5,17 @@ Opal::Connect.plugin :store
 class StoreFooTest
   include Opal::Connect
 
-  setup do
+  def self.setup
     store.set :foo, 'bar'
+    store.set :server_foo, 'bar' unless RUBY_ENGINE == 'opal'
   end
 
-  setup do
-    store.set :server_foo, 'bar'
-  end unless RUBY_ENGINE == 'opal'
 end
 
 class StoreBarTest
   include Opal::Connect
 
-  setup do
+  def self.setup
     store.set :foo, 'foo'
   end
 end

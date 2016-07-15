@@ -1,7 +1,7 @@
 require 'opal-connect'
 
 Opal::Connect.setup do
-  plugins :server, :html, :dom, :events
+  plugins :server, :html, :dom, :events, :store
 
   plugin :scope, App.new('')
   plugin :rspec

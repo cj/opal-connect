@@ -3,7 +3,7 @@ class App
     class Example
       include Opal::Connect
 
-      setup do
+      def self.setup
         dom.set! html! {
           html do
             head do

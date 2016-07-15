@@ -3,7 +3,7 @@ require 'spec_helper'
 class DomTest
   include Opal::Connect
 
-  setup do
+  def self.setup
     dom.set! html! {
       html do
         head do

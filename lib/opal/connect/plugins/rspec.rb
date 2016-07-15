@@ -52,8 +52,7 @@ module Opal::Connect
             }
 
             Dir["#{options[:folder]}/**/*_spec.rb"].each { |file| load file }
-            Opal::Connect.run
-            Opal::Connect.write_entry_file 'rspec_entry'
+            Opal::Connect.run 'rspec_entry'
 
             tmpl = html! {
               html do

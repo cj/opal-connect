@@ -34,6 +34,7 @@ module Opal
           javascript:     [],
           requires:       [],
           setup_blocks:   {},
+          classes:        [],
           setup:        false,
           run:          false
         )
@@ -56,24 +57,27 @@ module Opal
         instance_exec(&block) if block_given?
       end
 
-      def run
-        options[:setup_blocks].each do |klass, blocks|
-          blocks.each { |b| klass.instance_exec(&b) }
-        end
+      def run(entry_file = 'entry')
+        unless RUBY_ENGINE == 'opal'
+          Opal.append_path Dir.pwd
 
-        options[:setup_blocks] = ConnectCache.new
-
-        if !options[:run] && RUBY_ENGINE != 'opal'
-          write_entry_file
-
-          opal_code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
-          opal_stubs = Opal::Config.stubbed_files.to_a
+          opal_code  = Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+          opal_stubs = Config.stubbed_files.to_a
           Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
 
           Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
 
-          options[:run] = true
+          write_entry_file(entry_file) unless RUBY_ENGINE == 'opal'
         end
+
+        Connect.options[:classes].each do |class_string|
+          next unless class_string
+
+          klass = Object.const_get(class_string)
+          klass.setup if klass.respond_to?(:setup)
+        end
+
+        write_entry_file(entry_file) unless RUBY_ENGINE == 'opal'
       end
 
       def included(klass)
@@ -81,6 +85,8 @@ module Opal
           file = caller[0][/[^:]*/].sub(Dir.pwd, '')[1..-1]
           included_files << file unless files.include?(file) || file[/^spec/]
         end
+
+        Connect.options[:classes] << klass.name unless Connect.options[:classes].include?(klass.name)
 
         klass.extend ConnectPlugins::Base::ClassMethods
 
@@ -195,8 +201,10 @@ module Opal
         module InstanceMethods
           if RUBY_ENGINE != 'opal'
             def render(method, *options, &block)
-              Connect.run
-
+              unless Connect.options[:run]
+                Connect.options[:run] = true
+                Connect.run
+              end
               %{#{public_send(method, *options, &block)}
                 <script>#{ Connect.build Connect.javascript(self, method, *options)}</script>}
             end
@@ -206,15 +214,6 @@ module Opal
         module ClassMethods
           def render(method, *args, &block)
             new.render(method, *args, &block)
-          end
-
-          def setup(&block)
-            if block_given?
-              @_setup_block = block
-              (Connect.options[:setup_blocks][self] ||= []) << @_setup_block
-            end
-
-            @_setup_block
           end
 
           # Load a new plugin into the current class.  A plugin can be a module
@@ -241,13 +240,13 @@ module Opal
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
             extend(plugin::ClassMethods)     if defined?(plugin::ClassMethods)
 
+            plugin.configure(Connect, *args, &block) if !included && plugin.respond_to?(:configure)
+
             unless included
               Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
               Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
               Connect.instance_exec(plugin, &plugin::ConnectSetup) if defined?(plugin::ConnectSetup)
             end
-
-            plugin.configure(Connect, *args, &block) if !included && plugin.respond_to?(:configure)
 
             nil
           end
@@ -287,8 +286,6 @@ module Opal
             end
 
             def write_entry_file(entry_name = 'entry')
-              Opal.append_path Dir.pwd
-
               klass          = Class.new { include Opal::Connect }
               path           = "#{Dir.pwd}/.connect"
               files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join("\n")
