@@ -61,7 +61,7 @@ module Opal
 
         unless block_given?
           unless RUBY_ENGINE == 'opal'
-            write_entry_file(self)
+            write_entry_file
 
             opal_code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
             opal_stubs = Opal::Config.stubbed_files.to_a
@@ -268,30 +268,27 @@ module Opal
               builder(stubs).build_str(code, '(inline)').to_s
             end
 
-            def javascript(klass = false, method = '', *opts)
-              klass = Class.new { include Opal::Connect }.new unless klass
-
+            def javascript(klass, method = false, *opts)
               js = []
               options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) }
 
               %{
-                #{js.join(';')}
+                #{js.join("\n")}
 
                 Document.ready? do
                   klass = #{klass.class.name}.new
-                  unless "#{method}".empty?
-                    klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})
-                  end
+                  #{method ? "klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})" : ''}
                 end
               }
             end
 
-            def write_entry_file(klass = false, method = false, *options)
+            def write_entry_file
+              klass          = Class.new { include Opal::Connect }
               path           = "#{Dir.pwd}/.connect"
-              files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join(';')
+              files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join("\n")
               entry          = []
               client_options = Base64.encode64 Connect.client_options.to_json
-              plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join(';')
+              plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join("\n")
 
               Connect.options[:entry].uniq.each { |block| entry << klass.instance_exec(&block) }
 
@@ -304,8 +301,8 @@ module Opal
                 # make sure we include the default plugins with connect
                 Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug }
                 Opal::Connect.setup
-                #{entry.join(';')}
-                #{javascript(klass, method, *options)}
+                #{entry.join("\n")}
+                #{javascript(klass)}
               }
 
               FileUtils.mkdir_p(path)

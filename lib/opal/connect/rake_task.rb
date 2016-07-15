@@ -71,8 +71,6 @@ module Opal
       def initialize_connect
         return unless defined? Opal.append_path
 
-        Opal::Connect.write_entry_file(self)
-
         ENV.to_h.merge({
           BUNDLE_BIN: true,
           CONNECT_STUBS: "#{Opal::Connect.stubbed_files.join(',')},opal-connect,opal-jquery,opal-rspec",

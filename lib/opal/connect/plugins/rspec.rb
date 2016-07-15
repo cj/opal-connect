@@ -53,7 +53,7 @@ module Opal::Connect
 
             Dir["#{options[:folder]}/**/*_spec.rb"].each { |file| load file }
             Opal::Connect.setup
-            Opal::Connect.write_entry_file(self)
+            Opal::Connect.write_entry_file
 
             tmpl = html! {
               html do
