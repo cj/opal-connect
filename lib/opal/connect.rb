@@ -6,10 +6,6 @@ require "opal/connect/version"
 if RUBY_ENGINE == 'opal'
   require 'opal/connect/puts'
 else
-  unless File.exists?('.connect/entry.rb')
-    FileUtils.mkdir_p('.connect')
-    File.write '.connect/entry.rb', ''
-  end
   require 'oga'
   require 'opal/patch'
   Opal.append_path File.expand_path('../..', __FILE__).untaint
@@ -33,7 +29,6 @@ module Opal
           entry:          [],
           javascript:     [],
           requires:       [],
-          setup_blocks:   {},
           classes:        [],
           setup:        false,
           run:          false
@@ -60,16 +55,26 @@ module Opal
       def run(entry_file = 'entry')
         unless RUBY_ENGINE == 'opal'
           Opal.append_path Dir.pwd
-
-          opal_code  = Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
-          opal_stubs = Config.stubbed_files.to_a
-          Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
-
-          Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
-
-          write_entry_file(entry_file) unless RUBY_ENGINE == 'opal'
+          write_files
+          write_entry_file(entry_file)
         end
 
+        run_setups
+
+        write_entry_file(entry_file) unless RUBY_ENGINE == 'opal'
+      end
+
+      def write_files
+        Opal.append_path Dir.pwd
+
+        opal_code  = Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+        opal_stubs = Config.stubbed_files.to_a
+        Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
+
+        Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
+      end
+
+      def run_setups
         Connect.options[:classes].each do |class_string|
           next unless class_string
 
@@ -77,7 +82,7 @@ module Opal
           klass.setup if klass.respond_to?(:setup)
         end
 
-        write_entry_file(entry_file) unless RUBY_ENGINE == 'opal'
+        Connect.options[:classes] = []
       end
 
       def included(klass)
@@ -203,7 +208,7 @@ module Opal
             def render(method, *options, &block)
               unless Connect.options[:run]
                 Connect.options[:run] = true
-                Connect.run
+                File.exist?('.connect/entry.rb') ? Connect.run_setups : Connect.run
               end
               %{#{public_send(method, *options, &block)}
                 <script>#{ Connect.build Connect.javascript(self, method, *options)}</script>}

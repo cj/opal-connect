@@ -22,6 +22,8 @@ if RUBY_ENGINE == 'opal'
       end
     end
   end
+else
+  Opal::Connect.run 'rspec_entry'
 end
 
 module RSpecHelpers
@@ -35,6 +37,7 @@ end
 RSpec.configure do |config|
   config.extend RSpecHelpers
   config.include RSpecHelpers
+  config.before(:suite) { Opal::Connect.run_setups }
 
   if RUBY_ENGINE == 'opal'
     config.before { rspec_dom.find('body').append html! { iframe id: 'rspec-iframe' } }

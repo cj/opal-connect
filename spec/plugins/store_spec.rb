@@ -6,8 +6,14 @@ class StoreFooTest
   include Opal::Connect
 
   def self.setup
+    store[:array] ||= []
+    store[:array] << 'one'
     store.set :foo, 'bar'
-    store.set :server_foo, 'bar' unless RUBY_ENGINE == 'opal'
+    if RUBY_ENGINE == 'opal'
+      store[:client_foo] = 'bar'
+    else
+      store.set :server_foo, 'bar'
+    end
   end
 
 end
@@ -23,6 +29,13 @@ end
 describe 'plugin :store' do
   context 'class' do
     it 'should get foo and return bar' do
+      if RUBY_ENGINE == 'opal'
+        expect(StoreFooTest.store[:client_foo]).to eq 'bar'
+        expect(StoreFooTest.store[:array].length).to eq 2
+      else
+        expect(StoreFooTest.store[:client_foo]).to eq nil
+        expect(StoreFooTest.store[:array].length).to eq 1
+      end
       expect(StoreFooTest.store.get :foo).to eq 'bar'
       expect(StoreFooTest.store.get :server_foo).to eq 'bar'
       expect(StoreBarTest.store.get :foo).not_to eq 'bar'
