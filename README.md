@@ -1,5 +1,5 @@
 # **Opal-Connect** *(OC)*
-##### *Makes working with opal even easier!*
+##### *Make working with opal even easier!*
 
 ## Installation:
 
