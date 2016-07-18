@@ -59,7 +59,7 @@ class App < Roda
 
 That's it!  Start the server, visit the root URL and you'll see `OpalComponent` printed out.
 
-## `Opal::Connect` class methods
+## `Opal::Connect#class`
 
 - [Opal::Connect#options]
 - [Opal::Connect#client_options]
