@@ -59,43 +59,43 @@ class App < Roda
 
 That's it!  Start the server, visit the root URL and you'll see `OpalComponent` printed out.
 
-## Core Methods
+## `Opal::Connect` class methods
 
-- [class#options]
-- [class#client_options]
-- [class#stubbed_files]
-- [class#files]
-- [class#setup]
-- [class#run]
-- [class#write_files]
-- [class#run_setup]
-- [class#included]
+- [Opal::Connect#options]
+- [Opal::Connect#client_options]
+- [Opal::Connect#stubbed_files]
+- [Opal::Connect#files]
+- [Opal::Connect#setup]
+- [Opal::Connect#run]
+- [Opal::Connect#write_files]
+- [Opal::Connect#run_setup]
+- [Opal::Connect#included]
 
-## <a name="class-options"></a>Opal::Connect#options
+## <a name="OpalConnect-class-options"></a>Opal::Connect#options
 ###### Configuration options for [OC]
 
 | key | default | type | description |
 |-----|---------|------|-------------|
 | url | /connect| String| The url that will handle connect requests. |
-| plugins | [] | Array | Stores an array of all plugins (ones added by [class#plugin]). |
+| plugins | [] | Array | Stores an array of all plugins (ones added by [Opal::Connect#plugin]). |
 | plugins_loaded | [] | Array | Stores an array of all plugins loaded. |
-| entry | [] | Array | Stores all the entry blocks to be run when [class#write_entry_file] is called.
-| javascript | [] | Array | Stores all the javascript blocks to execute when [class#render] is called. |
+| entry | [] | Array | Stores all the entry blocks to be run when [Opal::Connect#write_entry_file] is called.
+| javascript | [] | Array | Stores all the javascript blocks to execute when [Opal::Connect#render] is called. |
 | classes | [] | Array | List of classes using [OC]. |
 | run | false | Boolean | whether or not [OC] has been run yet. |
-| stubbed_files | [] | Array | List of files to be stubbed by [Opal] using [class#stubbed_files] |
+| stubbed_files | [] | Array | List of files to be stubbed by [Opal] using [Opal::Connect#stubbed_files] |
 
 
-## <a name="class-client_options"></a>Opal::Connect#client_options
+## <a name="OpalConnect-class-client_options"></a>Opal::Connect#client_options
 ##### Server options that are passed to the client options.
 
-## <a name="class-stubbed_files"></a>Opal::Connect#stubbed_files
+## <a name="OpalConnect-class-stubbed_files"></a>Opal::Connect#stubbed_files
 ##### Files that are stubbed in opal and will not get passed.
 
-## <a name="class-files"></a>Opal::Connect#files
+## <a name="OpalConnect-class-files"></a>Opal::Connect#files
 ##### Files to be compiled with [Opal] by [OC] and output to the `.connect/` folder in the root of your project.
 
-## <a name="class-setup"></a>Opal::Connect#setup
+## <a name="OpalConnect-class-setup"></a>Opal::Connect#setup
 ##### If you find yourself using a lot of plugins/options, you can use this setup block.
 
 ```ruby
@@ -105,16 +105,16 @@ Opal::Connect.setup do
 end
 ```
 
-## <a name="class-run"></a>Opal::Connect#run
-##### This will trigger [class#write_files], [class#write_entry_file] and [class#run_setups].
+## <a name="OpalConnect-class-run"></a>Opal::Connect#run
+##### This will trigger [Opal::Connect#write_files], [Opal::Connect#write_entry_file] and [Opal::Connect#run_setups].
 
-## <a name="class-write_files"></a>Opal::Connect#write_files
-##### This will write the opal file and any files contained in [class#files] to the `.connect/` folder.
+## <a name="OpalConnect-class-write_files"></a>Opal::Connect#write_files
+##### This will write the opal file and any files contained in [Opal::Connect#files] to the `.connect/` folder.
 
-## <a name="class-run_setups"></a>Opal::Connect#run_setups
-##### This will run all the `class#setup` blocks defined in your classes. **Not to be confused with `Opal::Connect#setup`**
+## <a name="OpalConnect-class-run_setups"></a>Opal::Connect#run_setups
+##### This will run all the `Opal::Connect#setup` blocks defined in your classes. **Not to be confused with `Opal::Connect#setup`**
 
-## <a name="class-included"></a>Opal::Connect#included
+## <a name="OpalConnect-class-included"></a>Opal::Connect#included
 ##### Called when you `include Opal::Connect` into your class.  It will register it with [OC] and add the plugins for that class to use
 
 [Opal]: https://github.com/opal/opal "Opal"
@@ -122,15 +122,15 @@ end
 [Sprockets]: https://github.com/rails/sprockets "Sprockets"
 [OC]: https://github.com/cj/opal-connect "OC"
 
-[class#options]: #class-options
-[class#client_options]: #class-client_options
-[class#plugin]: #class-plugin
-[class#write_entry_file]: #class-write_entry_file
-[class#render]: #class-render
-[class#stubbed_files]: #class-stubbed_files
-[class#files]: #class-files
-[class#setup]: #class-setup
-[class#run]: #class-run
-[class#write_files]: #class-write_files
-[class#run_setup]: #class-run_setup
-[class#included]: #class-included
+[Opal::Connect#options]: #OpalConnect-class-options
+[Opal::Connect#client_options]: #OpalConnect-class-client_options
+[Opal::Connect#plugin]: #OpalConnect-class-plugin
+[Opal::Connect#write_entry_file]: #OpalConnect-class-write_entry_file
+[Opal::Connect#render]: #OpalConnect-class-render
+[Opal::Connect#stubbed_files]: #OpalConnect-class-stubbed_files
+[Opal::Connect#files]: #OpalConnect-class-files
+[Opal::Connect#setup]: #OpalConnect-class-setup
+[Opal::Connect#run]: #OpalConnect-class-run
+[Opal::Connect#write_files]: #OpalConnect-class-write_files
+[Opal::Connect#run_setup]: #OpalConnect-class-run_setup
+[Opal::Connect#included]: #OpalConnect-class-included
