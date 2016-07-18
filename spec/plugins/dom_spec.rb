@@ -13,6 +13,7 @@ class DomTest
         body do
           div do
             ul class: 'list' do
+              li "Two\nLines"
               li {}
             end
           end
@@ -20,6 +21,8 @@ class DomTest
       end
     }
 
+    dom.find('li:first-child').save! :multiline_html
+    dom.find('li:last-child').save! :inline_html, false
     dom.save! :html, false
   end unless RUBY_ENGINE == 'opal'
 end
@@ -72,6 +75,19 @@ describe 'plugin :dom' do
         expect(ul.attr('class')).to eq 'list'
         expect(ul.attr('foo')).to eq 'bar'
         expect(ul.attr('number')).to eq '1'
+      end
+
+      it 'should allow to use a 1 line html as template' do
+        multiline_li = subject.dom.tmpl(:multiline_html)
+        multiline_li.find('li').append '<span>works</span>'
+        dom.find('ul').append multiline_li
+        expect(dom.find('li').length).to eq 2
+        expect(dom.find('li span').length).to eq 1
+
+        inline_li = subject.dom.tmpl(:inline_html)
+        inline_li.find('li').append '<span>bug here</span>'
+        dom.find('ul').append inline_li
+        expect(dom.find('li span').length).to eq 2
       end
     end
   end
