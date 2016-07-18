@@ -1,22 +1,14 @@
 require_relative 'config/connect'
 
 class App < Roda
-  plugin :assets,
-    path: '',
-    css_dir: '',
-    js_dir: '',
-    group_subdirs: false,
-    gzip: true,
-    js_opts: { builder: Opal::Connect.builder },
-    js: {
-      app: ['node_modules/jquery/dist/jquery.js', '.connect/opal.js', '.connect/connect.js', '.connect/entry.rb'],
-      rspec: ['.connect/rspec.js', '.connect/rspec_tests.js']
-    }
-
-  # use Rack::LiveReload
-
   route do |r|
-    r.assets
+    r.on Opal::Connect.sprockets[:maps_prefix_url] do
+      r.run Opal::Connect.sprockets[:maps_app]
+    end
+
+    r.on Opal::Connect.sprockets[:prefix_url] do
+      r.run Opal::Connect.sprockets[:server]
+    end
 
     r.root do
       Components::Example.scope(self).render :display

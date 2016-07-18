@@ -1,10 +1,9 @@
 require 'opal'
 require 'base64'
+require 'json'
 require "opal/connect/version"
 
 if RUBY_ENGINE == 'opal'
-  `if(typeof require === 'undefined') { require = function(){} }`
-  `require("expose?$!expose?jQuery!jquery/dist/jquery.min.js")`
   require 'opal/connect/puts'
 else
   require 'oga'
@@ -24,13 +23,15 @@ module Opal
 
       def options
         @_options ||= Connect::ConnectCache.new(
-          livereload: false,
-          url: '/connect',
-          plugins: [],
+          url:            '/connect',
+          plugins:        [],
           plugins_loaded: [],
-          javascript: [],
-          requires: [],
-          setup_blocks: {},
+          entry:          [],
+          javascript:     [],
+          requires:       [],
+          classes:        [],
+          stubbed_files:  [],
+          run:            false
         )
       end
 
@@ -47,35 +48,41 @@ module Opal
       end
 
       def setup(&block)
-        if RUBY_ENGINE != 'opal' && block_given?
-          Opal.append_path Dir.pwd unless RUBY_ENGINE == 'opal'
+        Opal.append_path Dir.pwd
+        instance_exec(&block) if block_given?
+      end
 
-          instance_exec(&block)
-
-          # make sure we include the default plugins with connect
-          options[:plugins].each do |plug|
-            unless options[:plugins_loaded].include? plug
-              options[:plugins_loaded] << plug
-              Connect.plugin(plug)
-            end
-          end
+      def run(entry_file = 'entry')
+        unless RUBY_ENGINE == 'opal'
+          Opal.append_path Dir.pwd
+          write_files
+          write_entry_file(entry_file)
         end
 
-        unless block_given?
-          unless RUBY_ENGINE == 'opal'
-            opal_code  = Opal::Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
-            opal_stubs = Opal::Config.stubbed_files.to_a
-            Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
+        run_setups
 
-            Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
-          end
+        write_entry_file(entry_file) unless RUBY_ENGINE == 'opal'
+      end
 
-          options[:setup_blocks].each do |klass, blocks|
-            blocks.each { |b| klass.instance_exec(&b) }
-          end
+      def write_files
+        Opal.append_path Dir.pwd
 
-          options[:setup_blocks] = {}
+        opal_code  = Connect::STUBS.map { |stub| "require '#{stub}'" }.join(";")
+        opal_stubs = Config.stubbed_files.to_a
+        Opal::Connect.write_file(:opal, opal_code, Opal::VERSION, opal_stubs)
+
+        Connect.files.each { |name, (code, version, stubs)| write_file name, code, version, stubs }
+      end
+
+      def run_setups
+        Connect.options[:classes].each do |class_string|
+          next unless class_string
+
+          klass = Object.const_get(class_string)
+          klass.setup if klass.respond_to?(:setup)
         end
+
+        Connect.options[:classes] = []
       end
 
       def included(klass)
@@ -83,6 +90,8 @@ module Opal
           file = caller[0][/[^:]*/].sub(Dir.pwd, '')[1..-1]
           included_files << file unless files.include?(file) || file[/^spec/]
         end
+
+        Connect.options[:classes] << klass.name unless Connect.options[:classes].include?(klass.name)
 
         klass.extend ConnectPlugins::Base::ClassMethods
 
@@ -96,9 +105,9 @@ module Opal
       # Create a new thread safe cache.
       def initialize(options = false)
         @mutex = Mutex.new if RUBY_ENGINE != 'opal'
-        @hash  = options || {}
-        @hash.each { |k, v| @hash[k] = ConnectCache.new(v) if v.is_a?(Hash) }
-        @hash
+        hash  = options || {}
+        # make a copy of the hash passed so changes don't effect the one passed in.
+        @hash = Hash[hash.map{|k,v| [k, (v.is_a?(Hash) ? ConnectCache.new(v) : v)]}]
       end
 
       # Make getting value from underlying hash thread safe.
@@ -155,6 +164,14 @@ module Opal
     module ConnectPlugins
       @plugins = ConnectCache.new
 
+      def self.javascript(&block)
+        Connect.options[:javascript] << block
+      end
+
+      def self.entry(&block)
+        Connect.options[:entry] << block
+      end
+
       def self.plugins
         @plugins
       end
@@ -189,11 +206,12 @@ module Opal
         module InstanceMethods
           if RUBY_ENGINE != 'opal'
             def render(method, *options, &block)
-              code = Connect.javascript(self, method, *options)
-
-              Connect.write_entry_file(self, method, *options) if Connect.options[:livereload]
-
-              "#{public_send(method, *options, &block)}<script>#{Connect.build(code)}</script>"
+              unless Connect.options[:run]
+                Connect.options[:run] = true
+                File.exist?('.connect/entry.rb') ? Connect.run_setups : Connect.run
+              end
+              %{#{public_send(method, *options, &block)}
+                <script>#{ Connect.build Connect.javascript(self, method, *options)}</script>}
             end
           end
         end
@@ -201,15 +219,6 @@ module Opal
         module ClassMethods
           def render(method, *args, &block)
             new.render(method, *args, &block)
-          end
-
-          def setup(&block)
-            if block_given?
-              @_setup_block = block
-              (Connect.options[:setup_blocks][self] ||= []) << @_setup_block
-            end
-
-            @_setup_block
           end
 
           # Load a new plugin into the current class.  A plugin can be a module
@@ -236,19 +245,19 @@ module Opal
             include(plugin::InstanceMethods) if defined?(plugin::InstanceMethods)
             extend(plugin::ClassMethods)     if defined?(plugin::ClassMethods)
 
+            plugin.configure(Connect, *args, &block) if !included && plugin.respond_to?(:configure)
+
             unless included
               Connect.extend(plugin::ConnectClassMethods) if defined?(plugin::ConnectClassMethods)
               Connect.include(plugin::ConnectInstanceMethods) if defined?(plugin::ConnectInstanceMethods)
               Connect.instance_exec(plugin, &plugin::ConnectSetup) if defined?(plugin::ConnectSetup)
-
-              unless RUBY_ENGINE == 'opal'
-                Connect.options[:javascript] << plugin::ConnectJavascript if defined?(plugin::ConnectJavascript)
-              end
             end
 
-            plugin.configure(self, *args, &block) if !included && plugin.respond_to?(:configure)
-
             nil
+          end
+
+          def plugins(*plugins)
+            plugins.each { |plugin| Connect.plugin plugin}
           end
 
           if RUBY_ENGINE != 'opal'
@@ -267,46 +276,45 @@ module Opal
               builder(stubs).build_str(code, '(inline)').to_s
             end
 
-            def javascript(klass, method, *opts)
-              return unless klass
-
+            def javascript(klass, method = false, *opts)
               js = []
               options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) }
 
               %{
+                #{js.join("\n")}
+
                 Document.ready? do
-                  #{js.join(';')}
                   klass = #{klass.class.name}.new
-                  klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})
+                  #{method ? "klass.__send__(:#{method}, *JSON.parse(Base64.decode64('#{Base64.encode64 opts.to_json}'))) if klass.respond_to?(:#{method})" : ''}
                 end
               }
             end
 
-            def write_entry_file(klass = false, method = false, *options)
-              js             = []
+            def write_entry_file(entry_name = 'entry')
+              klass          = Class.new { include Opal::Connect }
               path           = "#{Dir.pwd}/.connect"
-              files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join(';')
-              entry          = Connect.options[:entry]
+              files          = Connect.included_files.dup.uniq.map { |file| "require '#{file}'" }.join("\n")
+              entry          = []
               client_options = Base64.encode64 Connect.client_options.to_json
-              plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join(';')
+              plugins        = plugin_paths.dup.map { |plugin_path| plugin_path = "require '#{plugin_path}'" }.join("\n")
 
-              Connect.options[:javascript].uniq.each { |block| js << klass.instance_exec(&block) } if klass
+              Connect.options[:entry].uniq.each { |block| entry << klass.instance_exec(&block) }
 
               entry_code = %{
                 require 'opal-connect'
                 #{plugins}
                 options = JSON.parse(Base64.decode64('#{client_options}'))
                 options.each { |key, value| Opal::Connect.options[key] = value }
-                #{entry}
                 #{files}
                 # make sure we include the default plugins with connect
                 Opal::Connect.options[:plugins].each { |plug| Opal::Connect.plugin plug }
-                Opal::Connect.setup
-                #{js.join(';')}
+                Opal::Connect.run
+                #{entry.join("\n")}
+                #{javascript(klass)}
               }
 
               FileUtils.mkdir_p(path)
-              File.write("#{path}/entry.rb", entry_code)
+              File.write("#{path}/#{entry_name}.rb", entry_code)
             end
 
             def write_file(name, code, current_version, stubs = false)

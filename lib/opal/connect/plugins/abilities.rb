@@ -7,6 +7,15 @@ require 'ability_list'
 
 module Opal::Connect
   module ConnectPlugins
+    javascript do
+      if current_user.respond_to?(:id) && current_user.id
+        abilities = Opal::Connect.options[:abilities][:list][current_user.role]
+        "$current_user_abilities = Base64.decode64('#{Base64.encode64 abilities.to_json}')"
+      else
+        "$current_user_abilities = {}"
+      end
+    end
+
     module Abilities
       def self.load_dependencies(connect, *args)
         connect.plugin :current_user
@@ -21,15 +30,6 @@ module Opal::Connect
           end
 
           connect.options[:abilities] = options
-        end
-      end
-
-      ConnectJavascript = -> do
-        if current_user.respond_to?(:id) && current_user.id
-          abilities = Opal::Connect.options[:abilities][:list][current_user.role]
-          "$current_user_abilities = Base64.decode64('#{Base64.encode64 abilities.to_json}')"
-        else
-          "$current_user_abilities = {}"
         end
       end
 

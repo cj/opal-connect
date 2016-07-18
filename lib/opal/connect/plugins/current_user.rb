@@ -3,6 +3,10 @@ require 'ostruct'
 module Opal
   module Connect
     module ConnectPlugins
+      javascript do
+        "$current_user = JSON.parse Base64.decode64('#{Base64.encode64 current_user.to_h.to_json}')"
+      end
+
       module CurrentUser
         def self.load_dependencies(connect, *args)
           connect.plugin :scope
@@ -18,10 +22,6 @@ module Opal
           end
 
           connect.options[:current_user] = options
-        end
-
-        ConnectJavascript = -> do
-          "$current_user = JSON.parse Base64.decode64('#{Base64.encode64 current_user.to_h.to_json}')"
         end
 
         module InstanceMethods

@@ -1,15 +1,15 @@
 module Opal
   module Connect
     module ConnectPlugins
+      entry do
+        templates = Base64.encode64 Connect.templates.hash.to_json
+        "Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
+      end
+
       # https://github.com/jeremyevans/roda/blob/master/lib/roda.rb#L16
       # A thread safe cache class, offering only #[] and #[]= methods,
       # each protected by a mutex.
       module Dom
-        ConnectJavascript = -> do
-          templates = Base64.encode64 Connect.templates.hash.to_json
-          "Opal::Connect.templates = JSON.parse(Base64.decode64('#{templates}'));"
-        end
-
         module ConnectClassMethods
           attr_accessor :templates
 
@@ -59,7 +59,7 @@ module Opal
 
         module InstanceMethods
           def cache
-            @cache ||= Connect.templates[self.class.name]
+            self.class.cache
           end
 
           def dom(selector = false)
@@ -87,7 +87,7 @@ module Opal
                 @dom = Element[selector]
               else
                 # multi-line
-                if selector["\n"] || selector['html']
+                if selector.is_a?(String)
                   @dom = Oga.parse_html(selector)
                 else
                   @dom = cache[:html]

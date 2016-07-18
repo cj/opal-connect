@@ -3,7 +3,7 @@ class App
     class Example
       include Opal::Connect
 
-      setup do
+      def self.setup
         dom.set! html! {
           html do
             head do
@@ -16,7 +16,8 @@ class App
           end
         }
 
-        dom.find('html').append assets([:js, :app])
+        # dom.find('html').append assets(:js)
+        dom.find('html').append connect_include_tag
 
         dom.save!
       end unless RUBY_ENGINE == 'opal'

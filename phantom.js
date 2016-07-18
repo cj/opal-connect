@@ -3,7 +3,7 @@ var page    = webPage.create();
 var system  = require('system');
 var args    = system.args.slice(1);
 
-page.settings.resourceTimeout = 5000; // 5 seconds
+page.settings.resourceTimeout = 25000; // 55 seconds
 
 page.onResourceTimeout = function(e) {
   console.log(e.errorCode);   // it'll probably be 408 
