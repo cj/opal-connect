@@ -79,13 +79,13 @@ describe 'plugin :dom' do
 
       it 'should allow to use a 1 line html as template' do
         multiline_li = subject.dom.tmpl(:multiline_html)
-        multiline_li.find('li').append '<span>works</span>'
+        multiline_li.append '<span>works</span>'
         dom.find('ul').append multiline_li
         expect(dom.find('li').length).to eq 2
         expect(dom.find('li span').length).to eq 1
 
         inline_li = subject.dom.tmpl(:inline_html)
-        inline_li.find('li').append '<span>bug here</span>'
+        inline_li.append '<span>bug here</span>'
         dom.find('ul').append inline_li
         expect(dom.find('li span').length).to eq 2
       end

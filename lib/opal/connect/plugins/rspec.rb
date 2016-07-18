@@ -34,11 +34,11 @@ module Opal::Connect
             end
 
             Opal::Connect.write_file :rspec, %{
-              require 'opal/connect/puts'
               require 'opal/rspec'
             }, "#{::RSpec::Version::STRING}#{Opal::RSpec::VERSION}"
 
             File.write "#{Dir.pwd}/.connect/rspec_tests.rb", %{
+              require 'opal/connect/puts'
               require 'opal/connect/rspec'
 
               RSpec.configure do |config|
