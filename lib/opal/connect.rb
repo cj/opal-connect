@@ -30,8 +30,8 @@ module Opal
           javascript:     [],
           requires:       [],
           classes:        [],
-          setup:        false,
-          run:          false
+          stubbed_files:  [],
+          run:            false
         )
       end
 
