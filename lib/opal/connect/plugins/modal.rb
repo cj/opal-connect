@@ -20,10 +20,15 @@ module Opal::Connect
                     div msg, class: 'modal-body'
 
                     div class: 'modal-footer' do
-                      if btn = options[:button]
-                        button btn, class: 'close btn btn-primary'
+                      if buttons = options[:buttons]
+                        buttons.each_with_index do |btn, index|
+                          btn_label = btn[:label] || btn.to_s
+                          btn_class = btn[:class] || 'close btn btn-default'
+                          button btn_label, class: btn_class, 'data-btn-index': index
+                        end
+                      else
+                        button 'Close', class: 'close btn btn-default'
                       end
-                      button 'Close', class: 'close btn btn'
                     end
                   end
                 end
@@ -45,6 +50,15 @@ module Opal::Connect
                 modal.close
                 dom.find('#modal').remove
               end
+            end
+
+            dom.find('#modal .modal-footer button').on :click do |evt|
+              button = evt.current_target
+              index = button.JS.data('btn-index')
+              callback = index ?
+                options.fetch(:buttons, []).fetch(index, {})[:on_click] : false
+
+              callback.call if callback
             end
 
             modal
